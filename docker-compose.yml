@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  chore-tracker:
+    container_name: chore-tracker
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Map to your Unraid appdata array
+      - /mnt/user/appdata/chore-tracker:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Optional: Automated Parent Email Reports (Gmail)
+      # - PARENT_EMAIL=parent@example.com
+      # - GMAIL_USER=yourgmail@gmail.com
+      # - GMAIL_APP_PASSWORD=your_16_char_app_password
+      # - DAILY_REPORT_HOUR=20

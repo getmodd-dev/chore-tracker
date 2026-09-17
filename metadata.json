@@ -1,0 +1,6 @@
+{
+  "name": "Chore Points Tracker",
+  "description": "iOS-optimized web app for Unraid server to track daily and total chore points, task streaks, family leaderboards, and custom rewards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

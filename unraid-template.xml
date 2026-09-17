@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>chore-tracker</Name>
+  <Repository>chore-tracker:latest</Repository>
+  <Registry>https://hub.docker.com/</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Overview>Family Chore, Allowance &amp; Rewards Tracker with Unraid persistent storage, iOS PWA support, and automated daily email reports.</Overview>
+  <Category>Productivity: Tools: HomeAutomation:</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.png</Icon>
+  <Config Name="WebUI Port" Target="3000" Default="3000" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="AppData Path" Target="/app/data" Default="/mnt/user/appdata/chore-tracker" Mode="rw" Description="Host directory for persistent chore JSON databases and backups" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/chore-tracker</Config>
+  <Config Name="Parent Email" Target="PARENT_EMAIL" Default="" Mode="" Description="Optional parent email address for 8:00 PM chore completion reports" Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="Gmail Username" Target="GMAIL_USER" Default="" Mode="" Description="Optional Gmail account for sending daily digests" Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Gmail App Password" Target="GMAIL_APP_PASSWORD" Default="" Mode="" Description="Optional Google 16-character App Password (requires 2FA enabled on Google account)" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+</Container>
