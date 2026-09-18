@@ -15,8 +15,13 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # Optional: Automated Parent Email Reports (Gmail)
+      - TZ=America/Los_Angeles
+      # Optional: Base URL of your Unraid server (for push notification linkbacks)
+      # - APP_URL=http://192.168.1.100:3000
+      # Optional: Pushover iOS Push Notifications
+      # - PUSHOVER_APP_TOKEN=your_30_character_pushover_app_token
+      # Optional: Automated Parent Email Reports & SMS via Gmail
       # - PARENT_EMAIL=parent@example.com
       # - GMAIL_USER=yourgmail@gmail.com
-      # - GMAIL_APP_PASSWORD=your_16_char_app_password
-      # - DAILY_REPORT_HOUR=20
+      # - GMAIL_APP_PASSWORD=your_16_character_app_password
+      # - DAILY_REPORT_TIME=20:00

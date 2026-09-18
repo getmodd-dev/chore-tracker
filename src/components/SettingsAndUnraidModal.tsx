@@ -284,13 +284,16 @@ services:
   <Overview>Family Chore, Allowance &amp; Rewards Tracker with Unraid persistent local storage, iOS Pushover notifications, and daily email digests.</Overview>
   <Category>Productivity: Tools: HomeAutomation:</Category>
   <WebUI>http://[IP]:[PORT:3000]/</WebUI>
-  <Icon>https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.png</Icon>
+  <Icon>https://raw.githubusercontent.com/getmodd-dev/chore-tracker/main/public/icon.svg</Icon>
   <Config Name="WebUI Port" Target="3000" Default="3000" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">3000</Config>
   <Config Name="AppData Path" Target="/app/data" Default="/mnt/user/appdata/chore-tracker" Mode="rw" Description="Host directory for persistent chore JSON databases and backups" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/chore-tracker</Config>
+  <Config Name="Timezone" Target="TZ" Default="America/Los_Angeles" Mode="" Description="Server timezone for midnight daily chore reset and scheduled digests" Type="Variable" Display="always" Required="false" Mask="false">America/Los_Angeles</Config>
+  <Config Name="App URL" Target="APP_URL" Default="" Mode="" Description="Optional local URL of your Unraid server (e.g. http://192.168.1.100:3000)" Type="Variable" Display="always" Required="false" Mask="false"></Config>
   <Config Name="Pushover App Token" Target="PUSHOVER_APP_TOKEN" Default="" Mode="" Description="30-character Application API token from pushover.net/apps/build for iOS push notifications" Type="Variable" Display="always" Required="false" Mask="true"></Config>
-  <Config Name="Parent Email" Target="PARENT_EMAIL" Default="" Mode="" Description="Optional parent email address for 8:00 PM chore completion reports" Type="Variable" Display="always" Required="false" Mask="false"></Config>
-  <Config Name="Gmail Username" Target="GMAIL_USER" Default="" Mode="" Description="Optional Gmail account for sending daily digests" Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
-  <Config Name="Gmail App Password" Target="GMAIL_APP_PASSWORD" Default="" Mode="" Description="Optional Google 16-character App Password" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Parent Email" Target="PARENT_EMAIL" Default="" Mode="" Description="Optional parent email address for daily chore completion reports" Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="Daily Report Time" Target="DAILY_REPORT_TIME" Default="20:00" Mode="" Description="24-hour time for daily parent email digest (defaults to 20:00 / 8:00 PM)" Type="Variable" Display="advanced" Required="false" Mask="false">20:00</Config>
+  <Config Name="Gmail Username" Target="GMAIL_USER" Default="" Mode="" Description="Optional Gmail account for sending daily digests and free SMS notifications" Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Gmail App Password" Target="GMAIL_APP_PASSWORD" Default="" Mode="" Description="Optional Google 16-character App Password (requires 2FA enabled on Google account)" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
 </Container>`;
 
   const copyDockerCommand = () => {
@@ -555,6 +558,12 @@ docker run -d \\
                   <span className="font-sans text-slate-500 font-medium">Repository:</span>
                   <span className="text-indigo-600 font-bold">chore-tracker:latest</span>
                 </div>
+                <div className="flex justify-between items-center p-2">
+                  <span className="font-sans text-slate-500 font-medium">Icon URL:</span>
+                  <span className="text-indigo-600 text-[10px] break-all max-w-[260px] text-right font-medium">
+                    https://raw.githubusercontent.com/getmodd-dev/chore-tracker/main/public/icon.svg
+                  </span>
+                </div>
                 <div className="flex justify-between p-2">
                   <span className="font-sans text-slate-500 font-medium">Network Type:</span>
                   <span className="text-slate-900">Bridge</span>
@@ -570,6 +579,22 @@ docker run -d \\
                 <div className="flex justify-between p-2">
                   <span className="font-sans text-slate-500 font-medium">WebUI:</span>
                   <span className="text-slate-900 font-bold">http://[IP]:[PORT:3000]/</span>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50/80">
+                  <span className="font-sans text-slate-500 font-medium">TZ (Timezone):</span>
+                  <span className="text-indigo-600 font-semibold">America/Los_Angeles</span>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50/80">
+                  <span className="font-sans text-slate-500 font-medium">PUSHOVER_APP_TOKEN (Optional):</span>
+                  <span className="text-slate-700">30-char token from pushover.net</span>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50/80">
+                  <span className="font-sans text-slate-500 font-medium">PARENT_EMAIL (Optional):</span>
+                  <span className="text-slate-700">your_parent_email@gmail.com</span>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50/80">
+                  <span className="font-sans text-slate-500 font-medium">GMAIL_USER & APP_PASSWORD:</span>
+                  <span className="text-slate-700">Optional for email digests</span>
                 </div>
               </div>
             </div>
