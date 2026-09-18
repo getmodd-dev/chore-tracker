@@ -26,8 +26,23 @@ import {
   Zap,
   MessageSquare,
   Bell,
+  Tag,
+  Calendar,
+  Clock,
+  RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 import { ChildNotificationConfigModal } from './ChildNotificationConfigModal';
+import {
+  APP_VERSION,
+  APP_VERSION_LABEL,
+  BUILD_DATE,
+  BUILD_TIME,
+  BUILD_TIMESTAMP,
+  BUILD_CHANNEL,
+  BUILD_ENVIRONMENT,
+  TIMEZONE_INFO,
+} from '../version';
 
 interface SettingsAndUnraidModalProps {
   data: FamilyAppData;
@@ -69,12 +84,21 @@ export const SettingsAndUnraidModal: React.FC<SettingsAndUnraidModalProps> = ({
   const [copiedDocker, setCopiedDocker] = useState(false);
   const [copiedCompose, setCopiedCompose] = useState(false);
   const [copiedXml, setCopiedXml] = useState(false);
-  const [unraidDeployTab, setUnraidDeployTab] = useState<'gui' | 'cli' | 'compose' | 'template'>('gui');
+  const [copiedVersion, setCopiedVersion] = useState(false);
+  const [copiedUpdate, setCopiedUpdate] = useState(false);
+  const [unraidDeployTab, setUnraidDeployTab] = useState<'gui' | 'cli' | 'compose' | 'template' | 'update'>('gui');
   const [serverStats, setServerStats] = useState<{
     storageDirectory?: string;
     dataFile?: string;
     dataFileSize?: number;
     platform?: string;
+    nodeVersion?: string;
+    version?: string;
+    versionLabel?: string;
+    buildDate?: string;
+    buildTimestamp?: string;
+    buildChannel?: string;
+    buildEnvironment?: string;
   } | null>(null);
 
   // Notification configuration modal state
@@ -297,6 +321,35 @@ services:
     URL.revokeObjectURL(url);
   };
 
+  const handleCopyVersionInfo = () => {
+    const info = `Chore Points & Rewards Tracker ${serverStats?.versionLabel || APP_VERSION_LABEL} (${serverStats?.buildChannel || BUILD_CHANNEL})\nBuild Date: ${serverStats?.buildTimestamp || BUILD_TIMESTAMP}\nTarget: ${serverStats?.buildEnvironment || BUILD_ENVIRONMENT}\nTimezone: ${TIMEZONE_INFO}\nStorage: ${serverStats?.dataFile || './data/chores_data.json'}`;
+    navigator.clipboard.writeText(info);
+    setCopiedVersion(true);
+    setTimeout(() => setCopiedVersion(false), 2000);
+  };
+
+  const updateCommandsCli = `# 1. Navigate to your Chore Tracker directory on Unraid
+cd /mnt/user/appdata/chore-tracker-src
+
+# 2. Rebuild the updated image
+docker build -t chore-tracker:latest .
+
+# 3. Stop and replace the running container (your data in /app/data remains safe!)
+docker stop chore-tracker
+docker rm chore-tracker
+docker run -d \\
+  --name=chore-tracker \\
+  --restart=unless-stopped \\
+  -p 3000:3000 \\
+  -v /mnt/user/appdata/chore-tracker:/app/data \\
+  chore-tracker:latest`;
+
+  const copyUpdateCommands = () => {
+    navigator.clipboard.writeText(updateCommandsCli);
+    setCopiedUpdate(true);
+    setTimeout(() => setCopiedUpdate(false), 2000);
+  };
+
   return (
     <div id="settings-unraid-view" className="space-y-5">
       {/* Parent Mode Lock / Unlock Section */}
@@ -381,8 +434,30 @@ services:
           </span>
         </div>
 
-        {/* Server metrics */}
+        {/* Server & App metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-slate-400 font-medium block text-[10px] uppercase">App Version</span>
+              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.2 rounded font-mono">
+                {serverStats?.buildChannel || BUILD_CHANNEL}
+              </span>
+            </div>
+            <span className="font-mono text-indigo-700 text-xs font-bold">
+              {serverStats?.versionLabel || APP_VERSION_LABEL}
+            </span>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70">
+            <span className="text-slate-400 font-medium block text-[10px] uppercase mb-1">Build Date</span>
+            <span className="font-semibold text-slate-800 text-xs block truncate">
+              {serverStats?.buildDate || BUILD_DATE}
+            </span>
+            <span className="text-slate-500 text-[10px]">
+              {BUILD_TIME}
+            </span>
+          </div>
+
           <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70">
             <span className="text-slate-400 font-medium block text-[10px] uppercase">Storage File Location</span>
             <span className="font-mono text-slate-700 text-[11px] break-all font-semibold">
@@ -444,6 +519,18 @@ services:
               }`}
             >
               4. Unraid XML Template
+            </button>
+            <button
+              type="button"
+              onClick={() => setUnraidDeployTab('update')}
+              className={`px-3 py-1.5 rounded-xl transition flex items-center gap-1 ${
+                unraidDeployTab === 'update'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <RefreshCw className="w-3 h-3 text-indigo-500" />
+              <span>5. How to Update</span>
             </button>
           </div>
 
@@ -555,6 +642,93 @@ services:
               <p className="text-[11px] text-slate-400">
                 Drop this file into your Unraid flash drive at: <code className="text-emerald-400 font-mono">/boot/config/plugins/dockerMan/templates-user/my-chore-tracker.xml</code> to make it appear in your "User Templates" dropdown.
               </p>
+            </div>
+          )}
+
+          {/* Tab 5: How to Update Container */}
+          {unraidDeployTab === 'update' && (
+            <div className="bg-slate-900 text-slate-200 p-4 rounded-2xl border border-slate-800 space-y-4 text-xs">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="p-1 rounded-lg bg-indigo-500/20 text-indigo-400">
+                    <RefreshCw className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h5 className="font-bold text-slate-100 text-xs">Updating to {APP_VERSION_LABEL} on Unraid</h5>
+                    <p className="text-[10px] text-slate-400">Step-by-step rebuild and restart procedure</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-emerald-950/60 border border-emerald-800/60 text-emerald-400 text-[10px] font-semibold px-2.5 py-1 rounded-lg">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Data is 100% Safe (Stored in /mnt/user/appdata)</span>
+                </div>
+              </div>
+
+              {/* Steps explanation */}
+              <div className="space-y-2.5 text-[11px] text-slate-300">
+                <div className="flex items-start gap-2 bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <div>
+                    <strong className="text-slate-100">Export or Pull the Latest Code:</strong>
+                    <p className="text-slate-400 text-[10px] mt-0.5">
+                      In the top-right menu of AI Studio, export your project (Download ZIP or push to GitHub). Unpack or git pull into your source folder on Unraid (e.g., <code className="text-indigo-300 font-mono">/mnt/user/appdata/chore-tracker-src</code>).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <div>
+                    <strong className="text-slate-100">Rebuild the Docker Image:</strong>
+                    <p className="text-slate-400 text-[10px] mt-0.5">
+                      Run the terminal command below. Docker will build the new {APP_VERSION_LABEL} bundle using the included multi-stage <code className="text-indigo-300 font-mono">Dockerfile</code>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <div>
+                    <strong className="text-slate-100">Restart the Container:</strong>
+                    <p className="text-slate-400 text-[10px] mt-0.5">
+                      The container boots with the new build. Because your chore data lives in <code className="text-emerald-400 font-mono">/mnt/user/appdata/chore-tracker</code>, all point totals, goals, rewards, and histories are automatically retained.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Option A: Terminal / CLI */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-indigo-300">Option A: Unraid Web Terminal (CLI)</span>
+                  <button
+                    type="button"
+                    onClick={copyUpdateCommands}
+                    className="flex items-center gap-1 text-[10px] font-bold bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded-lg transition"
+                  >
+                    {copiedUpdate ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedUpdate ? 'Copied!' : 'Copy Script'}</span>
+                  </button>
+                </div>
+                <pre className="text-[11px] font-mono text-emerald-400 overflow-x-auto whitespace-pre no-scrollbar p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  {updateCommandsCli}
+                </pre>
+              </div>
+
+              {/* Option B: Docker Compose */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-indigo-300">Option B: Docker Compose (Portainer or Compose Plugin)</span>
+                <pre className="text-[11px] font-mono text-emerald-400 overflow-x-auto whitespace-pre no-scrollbar p-3 bg-slate-950 rounded-xl border border-slate-800">
+{`cd /mnt/user/appdata/chore-tracker-src
+docker compose down
+docker compose up -d --build`}
+                </pre>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-800/50 text-[11px] text-indigo-200">
+                💡 <strong>Verification:</strong> After restarting, open the app and look at the bottom of the Settings page. You should see <strong className="text-white">{APP_VERSION_LABEL}</strong> with build date <strong className="text-white">{BUILD_DATE}</strong>.
+              </div>
             </div>
           )}
         </div>
@@ -1110,6 +1284,106 @@ services:
         </div>
         </>
       )}
+
+      {/* System Version & Build Information Card */}
+      <div id="system-version-card" className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
+              <Tag className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="font-bold text-sm text-slate-900">Chore Points & Rewards Tracker</h4>
+                <span className="bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full">
+                  {serverStats?.versionLabel || APP_VERSION_LABEL}
+                </span>
+                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+                  {serverStats?.buildChannel || BUILD_CHANNEL}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Build & release diagnostics for your home server installation
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCopyVersionInfo}
+            className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 active:scale-95 px-3 py-1.5 rounded-xl border border-slate-200 transition"
+            title="Copy system and build diagnostics to clipboard"
+          >
+            {copiedVersion ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-emerald-700">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy Specs</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 flex items-start gap-2.5">
+            <Calendar className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <span className="text-slate-400 font-medium block text-[10px] uppercase">Build Date</span>
+              <span className="font-semibold text-slate-800 text-xs">
+                {serverStats?.buildDate || BUILD_DATE}
+              </span>
+              <span className="text-slate-500 text-[11px] block mt-0.5 font-mono">
+                {BUILD_TIME}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 flex items-start gap-2.5">
+            <Clock className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <span className="text-slate-400 font-medium block text-[10px] uppercase">Active Timezone</span>
+              <span className="font-semibold text-slate-800 text-xs truncate block">
+                Pacific Time (PST/PDT)
+              </span>
+              <span className="text-slate-500 text-[11px] block mt-0.5">
+                Day resets strictly at midnight PST
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 flex items-start gap-2.5">
+            <Server className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <span className="text-slate-400 font-medium block text-[10px] uppercase">Target Environment</span>
+              <span className="font-semibold text-slate-800 text-xs truncate block">
+                {serverStats?.buildEnvironment || BUILD_ENVIRONMENT}
+              </span>
+              {serverStats?.nodeVersion && (
+                <span className="text-slate-500 text-[11px] block mt-0.5 font-mono">
+                  Node.js {serverStats.nodeVersion}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 flex items-start gap-2.5">
+            <HardDrive className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <span className="text-slate-400 font-medium block text-[10px] uppercase">Persistence Status</span>
+              <span className="font-semibold text-slate-800 text-xs truncate block">
+                {isServerOnline ? 'Unraid Persistent Storage' : 'Local Storage Cache'}
+              </span>
+              <span className="text-slate-500 text-[11px] block mt-0.5">
+                {serverStats?.dataFileSize ? `${(serverStats.dataFileSize / 1024).toFixed(1)} KB stored on disk` : 'Ready'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* iPhone Push Notification Configuration Modal */}
       {notificationConfigChild && (

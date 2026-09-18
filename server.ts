@@ -21,6 +21,14 @@ import {
   getPushoverAppToken,
   initPushoverScheduler,
 } from './src/server/pushoverService.ts';
+import {
+  APP_VERSION,
+  APP_VERSION_LABEL,
+  BUILD_DATE,
+  BUILD_TIMESTAMP,
+  BUILD_CHANNEL,
+  BUILD_ENVIRONMENT,
+} from './src/version.ts';
 
 const app = express();
 const PORT = 3000;
@@ -760,8 +768,27 @@ app.get('/api/unraid/status', (_req, res) => {
       dataFile: DATA_FILE,
       dataFileSize: fs.existsSync(DATA_FILE) ? fs.statSync(DATA_FILE).size : 0,
       nodeVersion: process.version,
+      version: APP_VERSION,
+      versionLabel: APP_VERSION_LABEL,
+      buildDate: BUILD_DATE,
+      buildTimestamp: BUILD_TIMESTAMP,
+      buildChannel: BUILD_CHANNEL,
+      buildEnvironment: BUILD_ENVIRONMENT,
     },
     message: 'Persistent storage active on Unraid local disk volume',
+  });
+});
+
+// GET Version & Build Info
+app.get('/api/version', (_req, res) => {
+  res.json({
+    version: APP_VERSION,
+    versionLabel: APP_VERSION_LABEL,
+    buildDate: BUILD_DATE,
+    buildTimestamp: BUILD_TIMESTAMP,
+    buildChannel: BUILD_CHANNEL,
+    buildEnvironment: BUILD_ENVIRONMENT,
+    timezone: APP_TIMEZONE,
   });
 });
 
