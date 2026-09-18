@@ -26,6 +26,7 @@ import {
   isChoreScheduledForDate,
   formatLocalDate,
 } from '../utils/schedule';
+import { getPacificDateStr, getPacificDayOfWeek } from '../utils/dateUtils';
 
 interface TaskListViewProps {
   child: Child;
@@ -98,7 +99,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   const [newIcon, setNewIcon] = useState('sparkles');
   const [newFrequency, setNewFrequency] = useState<'daily' | 'weekly' | 'anytime'>('daily');
   const [newChoreType, setNewChoreType] = useState<'allowance' | 'bonus_points' | 'both'>('allowance');
-  const [newDaysOfWeek, setNewDaysOfWeek] = useState<number[]>([new Date().getDay()]);
+  const [newDaysOfWeek, setNewDaysOfWeek] = useState<number[]>([getPacificDayOfWeek()]);
   const [newIntervalWeeks, setNewIntervalWeeks] = useState<number>(1);
   const [newScheduleStartDate, setNewScheduleStartDate] = useState<string>(todayStr);
   const [newAssignedTo, setNewAssignedTo] = useState<string[]>([]);
@@ -120,7 +121,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     setNewIcon('sparkles');
     setNewFrequency('daily');
     setNewChoreType('allowance');
-    setNewDaysOfWeek([new Date().getDay()]);
+    setNewDaysOfWeek([getPacificDayOfWeek()]);
     setNewIntervalWeeks(1);
     setNewScheduleStartDate(todayStr);
     setNewAssignedTo([]);
@@ -136,7 +137,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     setNewIcon(task.icon);
     setNewFrequency(task.frequency);
     setNewChoreType(task.choreType || 'allowance');
-    setNewDaysOfWeek(task.daysOfWeek && task.daysOfWeek.length > 0 ? [...task.daysOfWeek] : [new Date().getDay()]);
+    setNewDaysOfWeek(task.daysOfWeek && task.daysOfWeek.length > 0 ? [...task.daysOfWeek] : [getPacificDayOfWeek()]);
     setNewIntervalWeeks(task.intervalWeeks || 1);
     setNewScheduleStartDate(task.scheduleStartDate || todayStr);
     setNewAssignedTo(task.assignedTo || []);
@@ -215,7 +216,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
       category: newCategory,
       icon: newIcon,
       frequency: newFrequency,
-      daysOfWeek: newFrequency === 'weekly' ? (newDaysOfWeek.length > 0 ? newDaysOfWeek : [new Date().getDay()]) : undefined,
+      daysOfWeek: newFrequency === 'weekly' ? (newDaysOfWeek.length > 0 ? newDaysOfWeek : [getPacificDayOfWeek()]) : undefined,
       intervalWeeks: newFrequency === 'weekly' ? newIntervalWeeks : undefined,
       scheduleStartDate: newFrequency === 'weekly' && newIntervalWeeks === 2 ? newScheduleStartDate : undefined,
       isBonus: newChoreType === 'bonus_points' || newCategory === 'bonus',

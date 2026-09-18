@@ -1,6 +1,7 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import cron from 'node-cron';
 import { FamilyAppData, Child, TaskCompletionLog, ChoreTask } from '../types';
+import { getPacificDateStr, PACIFIC_TIMEZONE } from '../utils/dateUtils';
 
 let transporter: Transporter | null = null;
 let lastReportSentTimestamp: string | null = null;
@@ -44,13 +45,14 @@ function getTransporter(): Transporter {
 
 // Build clean, mobile-responsive HTML email for parents
 export function generateDailyReportHtml(data: FamilyAppData, targetDateStr?: string): { subject: string; html: string } {
-  const dateStr = targetDateStr || new Date().toISOString().split('T')[0];
-  const dateFormatted = new Date().toLocaleDateString('en-US', {
+  const dateStr = targetDateStr || getPacificDateStr(0);
+  const dateFormatted = new Intl.DateTimeFormat('en-US', {
+    timeZone: PACIFIC_TIMEZONE,
     weekday: 'long',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-  });
+  }).format(new Date());
 
   const dailyTasks = data.tasks.filter((t) => t.frequency === 'daily');
   const logsForDate = data.logs.filter((l) => l.dateStr === dateStr);
@@ -301,12 +303,18 @@ export function initEmailScheduler(readLatestData: () => FamilyAppData) {
   // Standard cron syntax: minute hour * * *
   const cronExpr = `${minute} ${hour} * * *`;
 
-  console.log(`[Email Scheduler] Initializing daily chore email job at ${reportTime} (${cronExpr})`);
+  console.log(`[Email Scheduler] Initializing daily chore email job at ${reportTime} PST/PDT (${cronExpr})`);
 
-  cron.schedule(cronExpr, async () => {
-    console.log(`[Email Scheduler] Triggering daily report send at ${new Date().toISOString()}...`);
-    const data = readLatestData();
-    const result = await sendDailyReport(data);
-    console.log(`[Email Scheduler] Result:`, result);
-  });
+  cron.schedule(
+    cronExpr,
+    async () => {
+      console.log(`[Email Scheduler] Triggering daily report send at ${new Date().toISOString()}...`);
+      const data = readLatestData();
+      const result = await sendDailyReport(data);
+      console.log(`[Email Scheduler] Result:`, result);
+    },
+    {
+      timezone: PACIFIC_TIMEZONE,
+    }
+  );
 }

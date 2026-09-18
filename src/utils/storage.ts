@@ -1,5 +1,6 @@
 import { FamilyAppData, TaskCompletionLog } from '../types';
 import { defaultFamilyData } from '../initialData';
+import { getPacificDateStr } from './dateUtils';
 
 const LOCAL_STORAGE_KEY = 'chore_tracker_local_cache_v1';
 
@@ -93,7 +94,7 @@ export async function apiCompleteTask(
   const task = current.tasks.find((t) => t.id === taskId);
   if (!child || !task) return { success: false };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getPacificDateStr(0);
   const targetDateStr = (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) ? dateStr : todayStr;
   const isAllowanceOnly = task.choreType === 'allowance' || (!task.choreType && !task.isBonus);
   const pts = isAllowanceOnly ? 0 : (Number(task.points) || 0);

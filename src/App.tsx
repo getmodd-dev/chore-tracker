@@ -20,6 +20,7 @@ import {
   apiRecordAllowancePayout,
 } from './utils/storage';
 import { calculateChildMonthlyAllowance } from './utils/allowance';
+import { getPacificDateStr, getMsUntilNextPacificMidnight } from './utils/dateUtils';
 import { IOSHeader } from './components/iOSHeader';
 import { IOSTabBar } from './components/iOSTabBar';
 import { DailyStatsCard } from './components/DailyStatsCard';
@@ -58,7 +59,37 @@ export default function App() {
   const selectedChild: Child =
     data.children.find((c) => c.id === selectedChildId) || data.children[0];
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const [todayStr, setTodayStr] = useState<string>(() => getPacificDateStr(0));
+
+  // Automatically roll over the day at midnight Pacific Time (PST/PDT)
+  useEffect(() => {
+    const updateToday = () => {
+      const currentPacificToday = getPacificDateStr(0);
+      setTodayStr((prev) => (prev !== currentPacificToday ? currentPacificToday : prev));
+    };
+
+    let timerId: ReturnType<typeof setTimeout>;
+    const scheduleNextPacificMidnight = () => {
+      const msUntilMidnight = getMsUntilNextPacificMidnight();
+      // Add 1000ms buffer past midnight to ensure clean calendar flip
+      timerId = setTimeout(() => {
+        updateToday();
+        scheduleNextPacificMidnight();
+      }, msUntilMidnight + 1000);
+    };
+
+    scheduleNextPacificMidnight();
+
+    // Check periodically in case device was sleeping/suspended
+    const intervalId = setInterval(updateToday, 30 * 1000);
+    window.addEventListener('focus', updateToday);
+
+    return () => {
+      clearTimeout(timerId);
+      clearInterval(intervalId);
+      window.removeEventListener('focus', updateToday);
+    };
+  }, []);
 
   // Daily points earned today by active child
   const childTodayLogs = data.logs.filter(

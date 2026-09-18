@@ -1,4 +1,12 @@
 import { ChoreTask } from '../types';
+import {
+  getDayOfWeekFromDateStr,
+  getPacificDateStr,
+  parseLocalDate,
+  formatPacificDate,
+} from './dateUtils';
+
+export { parseLocalDate };
 
 export const DAYS_OF_WEEK = [
   { day: 0, short: 'Sun', label: 'Sunday', letter: 'S' },
@@ -11,21 +19,10 @@ export const DAYS_OF_WEEK = [
 ] as const;
 
 /**
- * Parses YYYY-MM-DD string into a local Date without timezone offset shift.
- */
-export function parseLocalDate(dateStr: string): Date {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-/**
- * Converts a Date to YYYY-MM-DD local format string.
+ * Converts a Date to YYYY-MM-DD Pacific format string.
  */
 export function formatLocalDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return formatPacificDate(date);
 }
 
 /**
@@ -92,8 +89,7 @@ export function isChoreScheduledForDate(task: ChoreTask, targetDateStr: string):
     return true;
   }
 
-  const targetDate = parseLocalDate(targetDateStr);
-  const dayOfWeek = targetDate.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const dayOfWeek = getDayOfWeekFromDateStr(targetDateStr);
 
   if (!task.daysOfWeek.includes(dayOfWeek)) {
     return false;
@@ -105,6 +101,8 @@ export function isChoreScheduledForDate(task: ChoreTask, targetDateStr: string):
     const anchor = task.scheduleStartDate
       ? parseLocalDate(task.scheduleStartDate)
       : new Date(2026, 0, 4);
+
+    const targetDate = parseLocalDate(targetDateStr);
 
     // Normalize both to Sunday 00:00:00 local time
     const anchorSunday = new Date(
@@ -133,7 +131,7 @@ export function isChoreScheduledForDate(task: ChoreTask, targetDateStr: string):
 /**
  * Calculates the next upcoming scheduled date for a task starting from a reference date.
  */
-export function getNextScheduledDate(task: ChoreTask, fromDateStr: string = formatLocalDate(new Date())): string | null {
+export function getNextScheduledDate(task: ChoreTask, fromDateStr: string = getPacificDateStr(0)): string | null {
   if (task.frequency === 'daily' || task.frequency === 'anytime') {
     return fromDateStr;
   }

@@ -1,4 +1,5 @@
 import { FamilyAppData, Child } from '../types';
+import { getPacificParts, getPacificDateStr, getPacificDayOfWeek } from '../utils/dateUtils';
 
 /**
  * Pushover API Service for sending rich iOS push notifications to children.
@@ -28,7 +29,7 @@ export function composeChildPushoverMessage(
   data: FamilyAppData,
   targetDateStr?: string
 ): { title: string; message: string; sound: string; url?: string; url_title?: string } {
-  const dateStr = targetDateStr || new Date().toISOString().split('T')[0];
+  const dateStr = targetDateStr || getPacificDateStr(0);
   const logsForToday = data.logs.filter((l) => l.dateStr === dateStr && l.childId === child.id);
   const completedTaskIdSet = new Set(logsForToday.map((l) => l.taskId));
 
@@ -36,8 +37,8 @@ export function composeChildPushoverMessage(
   const dailyGoal = child.dailyGoal || 50;
   const isGoalMet = pointsToday >= dailyGoal;
 
-  // Find tasks scheduled or available for this child today
-  const dayOfWeek = new Date().getDay(); // 0 = Sun
+  // Find tasks scheduled or available for this child today in Pacific Time
+  const dayOfWeek = getPacificDayOfWeek(); // 0 = Sun
   const childTasks = data.tasks.filter((t) => {
     // Check child assignment
     if (t.assignedTo && t.assignedTo.length > 0 && !t.assignedTo.includes(child.id)) {
@@ -180,11 +181,9 @@ export function initPushoverScheduler(
   // Check every minute: 60 * 1000 ms
   setInterval(async () => {
     try {
-      const now = new Date();
-      const currentHours = String(now.getHours()).padStart(2, '0');
-      const currentMins = String(now.getMinutes()).padStart(2, '0');
-      const currentTimeStr = `${currentHours}:${currentMins}`;
-      const todayStr = now.toISOString().split('T')[0];
+      const pacificParts = getPacificParts();
+      const currentTimeStr = pacificParts.timeStr;
+      const todayStr = pacificParts.dateStr;
 
       const data = readLatestData();
       if (!data || !Array.isArray(data.children)) return;

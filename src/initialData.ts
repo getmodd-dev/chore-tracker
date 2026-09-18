@@ -1,9 +1,8 @@
 import { FamilyAppData } from './types';
+import { getPacificDateStr } from './utils/dateUtils';
 
 const getTodayDateStr = (offsetDays = 0) => {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().split('T')[0];
+  return getPacificDateStr(offsetDays);
 };
 
 export const defaultFamilyData: FamilyAppData = {

@@ -4,6 +4,7 @@ import { ChoreTask, TaskCompletionLog, Child, ChoreCategory, AppTheme } from '..
 import { ChoreIcon } from './ChoreIcon';
 import { playChoreDing } from '../utils/sound';
 import { formatScheduleLabel, isChoreScheduledForDate } from '../utils/schedule';
+import { getPacificDateStr, getPacificParts, formatPacificDate } from '../utils/dateUtils';
 import {
   ChevronLeft,
   ChevronRight,
@@ -34,10 +35,7 @@ interface ChoreCalendarProps {
 }
 
 export function toLocalDateStr(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return formatPacificDate(d);
 }
 
 export function parseLocalDateStr(str: string): Date {
@@ -58,13 +56,12 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
   theme = 'classic',
 }) => {
   const isFintech = theme === 'fintech_hustle';
-  const todayStr = toLocalDateStr(new Date());
+  const todayStr = getPacificDateStr(0);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(todayStr);
   const [activeChildFilter, setActiveChildFilter] = useState<string>(selectedChildId || 'all');
   const [viewDate, setViewDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d;
+    const parts = getPacificParts();
+    return new Date(parts.year, parts.month - 1, 1);
   });
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [undoingLogId, setUndoingLogId] = useState<string | null>(null);
@@ -83,8 +80,8 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
   };
 
   const handleJumpToday = () => {
-    const now = new Date();
-    setViewDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    const parts = getPacificParts();
+    setViewDate(new Date(parts.year, parts.month - 1, 1));
     setSelectedDateStr(todayStr);
   };
 

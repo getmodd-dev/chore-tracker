@@ -35,10 +35,46 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Initial seed data if file doesn't exist yet
-const getTodayDateStr = (offsetDays = 0) => {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
+// Timezone configuration (defaults to Pacific Time America/Los_Angeles)
+const APP_TIMEZONE = process.env.TZ || 'America/Los_Angeles';
+
+const getPacificParts = (date = new Date(), timezone = APP_TIMEZONE) => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    weekday: 'short',
+  }).formatToParts(date);
+
+  const map: Record<string, string> = {};
+  for (const p of parts) map[p.type] = p.value;
+
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayOfWeek = weekdays.indexOf(map.weekday);
+
+  return {
+    year: parseInt(map.year, 10),
+    month: parseInt(map.month, 10),
+    day: parseInt(map.day, 10),
+    hours: parseInt(map.hour, 10),
+    minutes: parseInt(map.minute, 10),
+    seconds: parseInt(map.second, 10),
+    dayOfWeek: dayOfWeek >= 0 ? dayOfWeek : 0,
+    dateStr: `${map.year}-${map.month}-${map.day}`,
+    timeStr: `${map.hour}:${map.minute}`,
+  };
+};
+
+// Returns YYYY-MM-DD in Pacific Time (day changes strictly at midnight PST/PDT)
+const getTodayDateStr = (offsetDays = 0, timezone = APP_TIMEZONE) => {
+  const parts = getPacificParts(new Date(), timezone);
+  if (offsetDays === 0) return parts.dateStr;
+  const d = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + offsetDays));
   return d.toISOString().split('T')[0];
 };
 
@@ -792,7 +828,7 @@ app.post('/api/sms/send-now', async (req, res) => {
 
   const result = await sendChildChoreSms(child, data, customText);
   if (result.success) {
-    child.lastSmsSentDate = new Date().toISOString().split('T')[0];
+    child.lastSmsSentDate = getTodayDateStr(0);
     writeData(data);
     res.json(result);
   } else {
@@ -849,7 +885,7 @@ app.post('/api/pushover/send-now', async (req, res) => {
   });
 
   if (result.success) {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayDateStr(0);
     child.lastNotificationSentDate = todayStr;
     writeData(data);
     res.json(result);

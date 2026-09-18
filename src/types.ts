@@ -112,6 +112,7 @@ export interface AppSettings {
   allowanceCurrencySymbol?: string; // default '$'
   defaultTheme?: AppTheme;
   pushoverAppToken?: string;        // Pushover Application API Token (e.g. 30 chars from pushover.net/apps/build)
+  timezone?: string;                // Timezone for midnight rollover (defaults to 'America/Los_Angeles' PST/PDT)
 }
 
 export interface FamilyAppData {

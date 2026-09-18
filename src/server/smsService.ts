@@ -1,6 +1,7 @@
 import { Transporter } from 'nodemailer';
 import { FamilyAppData, Child, ChoreTask, TaskCompletionLog } from '../types';
 import { getEmailConfig } from './emailService';
+import { getPacificParts, getPacificDateStr, getPacificDayOfWeek } from '../utils/dateUtils';
 import nodemailer from 'nodemailer';
 
 // Carrier SMS Gateways (AT&T primary as requested by user)
@@ -35,7 +36,7 @@ export function composeChildChoreSms(
   data: FamilyAppData,
   targetDateStr?: string
 ): { subject: string; text: string } {
-  const dateStr = targetDateStr || new Date().toISOString().split('T')[0];
+  const dateStr = targetDateStr || getPacificDateStr(0);
   const logsForToday = data.logs.filter((l) => l.dateStr === dateStr && l.childId === child.id);
   const completedTaskIdSet = new Set(logsForToday.map((l) => l.taskId));
 
@@ -43,8 +44,8 @@ export function composeChildChoreSms(
   const dailyGoal = child.dailyGoal || 50;
   const isGoalMet = pointsToday >= dailyGoal;
 
-  // Find tasks scheduled or available for this child today
-  const dayOfWeek = new Date().getDay(); // 0 = Sun
+  // Find tasks scheduled or available for this child today in Pacific Time
+  const dayOfWeek = getPacificDayOfWeek(); // 0 = Sun
   const childTasks = data.tasks.filter((t) => {
     // Check child assignment
     if (t.assignedTo && t.assignedTo.length > 0 && !t.assignedTo.includes(child.id)) {
@@ -169,12 +170,9 @@ export function initSmsScheduler(
   // Check every minute: "* * * * *"
   setInterval(async () => {
     try {
-      const now = new Date();
-      // Format HH:MM in 2-digit local time
-      const currentHours = String(now.getHours()).padStart(2, '0');
-      const currentMins = String(now.getMinutes()).padStart(2, '0');
-      const currentTimeStr = `${currentHours}:${currentMins}`;
-      const todayStr = now.toISOString().split('T')[0];
+      const pacificParts = getPacificParts();
+      const currentTimeStr = pacificParts.timeStr;
+      const todayStr = pacificParts.dateStr;
 
       const data = readLatestData();
       if (!data || !Array.isArray(data.children)) return;
