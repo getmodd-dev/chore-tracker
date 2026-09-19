@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
 import { ChoreTask, ChoreCategory, Child, TaskCompletionLog, AppTheme } from '../types';
 import { ChoreIcon } from './ChoreIcon';
+import { ChoreIconPicker } from './ChoreIconPicker';
 import {
   Check,
   Plus,
@@ -10,12 +11,11 @@ import {
   CheckCircle2,
   Calendar,
   Search,
-  Filter,
   Trash2,
   Edit2,
-  Star,
   Clock,
-  Zap,
+  Minimize2,
+  Maximize2,
   Users,
   User,
 } from 'lucide-react';
@@ -44,16 +44,6 @@ interface TaskListViewProps {
   theme?: AppTheme;
 }
 
-const CATEGORY_TABS: { id: 'all' | ChoreCategory; label: string; emoji: string }[] = [
-  { id: 'all', label: 'All Chores', emoji: '📋' },
-  { id: 'daily_routine', label: 'Daily Routine', emoji: '☀️' },
-  { id: 'bedroom_home', label: 'Bedroom & Home', emoji: '🏠' },
-  { id: 'school_study', label: 'School & Study', emoji: '📚' },
-  { id: 'pet_care', label: 'Pet Care', emoji: '🐾' },
-  { id: 'yard_outdoor', label: 'Yard & Plants', emoji: '🌱' },
-  { id: 'bonus', label: 'Bonus Tasks', emoji: '⭐' },
-];
-
 export const TaskListView: React.FC<TaskListViewProps> = ({
   child,
   childrenList = [],
@@ -70,26 +60,33 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   theme = 'classic',
 }) => {
   const isFintech = theme === 'fintech_hustle';
-  const [selectedCategory, setSelectedCategory] = useState<'all' | ChoreCategory>('all');
   const [scheduleViewFilter, setScheduleViewFilter] = useState<'due_today' | 'all'>('due_today');
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [animatingTaskId, setAnimatingTaskId] = useState<string | null>(null);
 
-  const todayStr = formatLocalDate(new Date());
+  // Compact / Minimized view state for child's chore list (persisted in localStorage, defaults to true)
+  const [isCompactView, setIsCompactView] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('chore_tracker_compact_view');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
 
-  const categoryTabs = isFintech
-    ? [
-        { id: 'all', label: 'All Tasks', emoji: '⚡' },
-        { id: 'daily_routine', label: 'Daily Grind', emoji: '🔥' },
-        { id: 'bedroom_home', label: 'Base / HQ', emoji: '🏠' },
-        { id: 'school_study', label: 'Academics & Skills', emoji: '💻' },
-        { id: 'pet_care', label: 'Pet Care', emoji: '🐾' },
-        { id: 'yard_outdoor', label: 'Field & Outdoor', emoji: '🌿' },
-        { id: 'bonus', label: 'Bonus Bounties', emoji: '💎' },
-      ]
-    : CATEGORY_TABS;
+  const toggleCompactView = () => {
+    setIsCompactView((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('chore_tracker_compact_view', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const todayStr = formatLocalDate(new Date());
 
   // Task form state
   const [newTitle, setNewTitle] = useState('');
@@ -147,9 +144,6 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   const filteredTasks = tasks.filter((task) => {
     // Check if task is assigned to this child
     if (task.assignedTo && task.assignedTo.length > 0 && !task.assignedTo.includes(child.id)) {
-      return false;
-    }
-    if (selectedCategory !== 'all' && task.category !== selectedCategory) {
       return false;
     }
     if (searchQuery.trim()) {
@@ -250,10 +244,10 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   });
 
   return (
-    <div id="tasks-view" className="space-y-4">
-      {/* View Filter: Due Today vs All Scheduled */}
+    <div id="tasks-view" className="space-y-3">
+      {/* View Filter: Due Today vs All Scheduled & View Mode Toggle */}
       <div
-        className={`flex items-center justify-between gap-2 flex-wrap p-1 rounded-2xl transition-colors ${
+        className={`flex items-center justify-between gap-2 flex-wrap p-1.5 rounded-2xl transition-colors ${
           isFintech ? 'bg-[#0d1628] border border-[#1b2a47]' : 'bg-slate-200/80'
         }`}
       >
@@ -307,59 +301,64 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
           </button>
         </div>
 
-        {isParentMode && (
+        {/* View Mode Toggle: Compact vs Detailed + Parent Add Button */}
+        <div className="flex items-center gap-1.5">
           <button
-            id="parent-add-chore-btn"
-            onClick={handleOpenAddModal}
-            className={`flex items-center gap-1 active:scale-95 px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition ${
-              isFintech
-                ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
-                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+            id="toggle-compact-view-btn"
+            onClick={toggleCompactView}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 border ${
+              isCompactView
+                ? isFintech
+                  ? 'bg-[#182644] text-cyan-300 border-cyan-500/40 shadow-xs'
+                  : 'bg-white text-indigo-700 border-indigo-200/80 shadow-xs'
+                : isFintech
+                ? 'bg-[#10192e] text-slate-400 border-[#1d2d4c] hover:text-white'
+                : 'bg-white/80 text-slate-600 border-slate-200 hover:text-slate-900'
             }`}
+            title={isCompactView ? 'Currently in Compact view (minimized). Click for Detailed cards.' : 'Currently in Detailed view. Click for Compact list.'}
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Task</span>
+            {isCompactView ? (
+              <>
+                <Minimize2 className="w-3.5 h-3.5 text-cyan-500" />
+                <span>Compact View</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Detailed View</span>
+              </>
+            )}
           </button>
-        )}
-      </div>
 
-      {/* Category Pills (iOS Horizontal Scroll) */}
-      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 -mx-2 px-2">
-        {categoryTabs.map((cat) => {
-          const isSelected = selectedCategory === cat.id;
-          return (
+          {isParentMode && (
             <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all active:scale-95 ${
-                isSelected
-                  ? isFintech
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-xs font-bold'
-                    : 'bg-indigo-600 text-white shadow-sm'
-                  : isFintech
-                  ? 'bg-[#10192e] text-slate-400 border border-[#1d2d4c] hover:bg-[#16233d] hover:text-white'
-                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+              id="parent-add-chore-btn"
+              onClick={handleOpenAddModal}
+              className={`flex items-center gap-1 active:scale-95 px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition ${
+                isFintech
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
               }`}
             >
-              <span>{cat.emoji}</span>
-              <span>{cat.label}</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Task</span>
             </button>
-          );
-        })}
+          )}
+        </div>
       </div>
 
       {/* Subheader with Search */}
-      <div className="relative flex-1">
+      <div className="relative">
         <Search className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isFintech ? 'text-emerald-400' : 'text-slate-400'}`} />
         <input
           type="text"
           placeholder={isFintech ? "Search quests & bounties..." : "Search chores..."}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className={`w-full pl-9 pr-3 py-1.5 text-xs rounded-xl focus:outline-none transition ${
+          className={`w-full pl-9 pr-3 py-2 text-xs rounded-xl focus:outline-none transition ${
             isFintech
               ? 'bg-[#10192e] border border-[#1d2d4c] text-white placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
-              : 'bg-white border border-slate-200 focus:ring-2 focus:ring-indigo-500'
+              : 'bg-white border border-slate-200 focus:ring-2 focus:ring-indigo-500 shadow-2xs'
           }`}
         />
       </div>
@@ -398,6 +397,159 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
             const isCompletedToday = !!completionLog;
             const isAnimating = animatingTaskId === task.id;
             const isDueToday = isChoreScheduledForDate(task, todayStr);
+
+            if (isCompactView) {
+              return (
+                <div
+                  key={task.id}
+                  id={`task-item-${task.id}`}
+                  className={`flex items-center justify-between py-2 px-3 sm:py-2.5 rounded-xl border transition-all ${
+                    isCompletedToday
+                      ? isFintech
+                        ? 'bg-[#0b1222]/80 border-[#15233c] opacity-75'
+                        : 'bg-emerald-50/70 border-emerald-200/80 opacity-85'
+                      : isFintech
+                      ? 'bg-[#111c33] hover:border-emerald-500/50 border-[#1e2f52] shadow-sm'
+                      : 'bg-white hover:border-indigo-300 border-slate-200/90 shadow-2xs'
+                  }`}
+                >
+                  {/* Left: Icon & Title */}
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                    <div
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border transition-transform ${
+                        isCompletedToday
+                          ? isFintech
+                            ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-400'
+                            : 'bg-emerald-100 border-emerald-300 text-emerald-700'
+                          : isFintech
+                          ? 'bg-[#182644] border-[#22365e] text-emerald-400'
+                          : 'bg-indigo-50 border-indigo-100 text-indigo-600'
+                      } ${isAnimating ? 'scale-125 rotate-12' : ''}`}
+                    >
+                      {isCompletedToday ? (
+                        <Check className="w-4 h-4 stroke-[3]" />
+                      ) : (
+                        <ChoreIcon name={task.icon} className="w-4 h-4" />
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1 flex items-center gap-2">
+                      <h4
+                        className={`text-xs sm:text-sm font-bold tracking-tight truncate ${
+                          isCompletedToday
+                            ? isFintech
+                              ? 'text-slate-500 line-through'
+                              : 'text-emerald-950 line-through'
+                            : isFintech
+                            ? 'text-white'
+                            : 'text-slate-900'
+                        }`}
+                        title={task.title}
+                      >
+                        {task.title}
+                      </h4>
+
+                      {/* Points / Allowance badge */}
+                      {task.choreType === 'allowance' ? (
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${
+                            isFintech
+                              ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                          title="Monthly Allowance Chore"
+                        >
+                          💵
+                        </span>
+                      ) : task.choreType === 'both' ? (
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0 font-mono ${
+                            isFintech
+                              ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/30'
+                              : 'bg-teal-100 text-teal-800'
+                          }`}
+                        >
+                          +{task.points} {currencySymbol} + 💵
+                        </span>
+                      ) : (
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0 font-mono ${
+                            isFintech
+                              ? 'bg-amber-950/80 text-amber-300 border border-amber-500/30'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          +{task.points} {currencySymbol}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Complete Button / Undo & Parent actions */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isCompletedToday ? (
+                      <div className="flex items-center gap-1">
+                        <span className={`text-[11px] font-bold mr-1 ${isFintech ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                          Done ✓
+                        </span>
+                        <button
+                          onClick={() => onUndoTask(completionLog.id)}
+                          className={`p-1.5 rounded-lg active:scale-95 transition border ${
+                            isFintech
+                              ? 'text-slate-400 hover:text-rose-400 bg-[#15233c] border-[#22365e]'
+                              : 'text-slate-400 hover:text-rose-600 bg-white border-slate-200'
+                          }`}
+                          title="Undo Chore Completion"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => handleComplete(task.id, e)}
+                        className={`flex items-center gap-1 active:scale-95 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs ${
+                          isFintech
+                            ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                            : task.choreType === 'allowance'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                        }`}
+                      >
+                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>Complete</span>
+                      </button>
+                    )}
+
+                    {isParentMode && (
+                      <div className="flex items-center gap-0.5 ml-1">
+                        <button
+                          onClick={() => handleOpenEditModal(task)}
+                          className={`p-1.5 rounded-lg transition ${
+                            isFintech
+                              ? 'text-slate-400 hover:text-emerald-400 hover:bg-[#1d2d4c]'
+                              : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
+                          }`}
+                          title="Edit Chore"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onDeleteTask(task.id)}
+                          className={`p-1.5 rounded-lg transition ${
+                            isFintech
+                              ? 'text-slate-400 hover:text-rose-400 hover:bg-rose-950/40'
+                              : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                          }`}
+                          title="Delete Chore"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <div
@@ -859,43 +1011,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">Category</label>
-                  <select
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value as ChoreCategory)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  >
-                    <option value="daily_routine">Daily Routine</option>
-                    <option value="bedroom_home">Bedroom & Home</option>
-                    <option value="school_study">School & Study</option>
-                    <option value="pet_care">Pet Care</option>
-                    <option value="yard_outdoor">Yard & Outdoor</option>
-                    <option value="bonus">Bonus Task</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">Icon Style</label>
-                  <select
-                    value={newIcon}
-                    onChange={(e) => setNewIcon(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  >
-                    <option value="sparkles">✨ Sparkles</option>
-                    <option value="bed">🛏️ Bed</option>
-                    <option value="shirt">👕 Laundry/Shirt</option>
-                    <option value="backpack">🎒 Backpack</option>
-                    <option value="book-open">📖 Reading/Book</option>
-                    <option value="utensils">🍽️ Dishes/Utensils</option>
-                    <option value="trash-2">🗑️ Trash</option>
-                    <option value="flower-2">🌱 Plants/Garden</option>
-                    <option value="chef-hat">👨‍🍳 Cooking</option>
-                    <option value="heart">❤️ Kindness</option>
-                  </select>
-                </div>
-              </div>
+              {/* Custom Icon & Emoji Picker (No Category Needed) */}
+              <ChoreIconPicker value={newIcon} onChange={setNewIcon} />
 
               {/* Chore Purpose / System Selector */}
               <div>
