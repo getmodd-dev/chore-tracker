@@ -38,8 +38,17 @@ export function calculateChildMonthlyAllowance(
   const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
-  const currentDay = date.getDate();
-  const daysElapsedInMonth = Math.max(1, currentDay);
+
+  // Determine if the requested month has fully concluded (in the past)
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const isPastMonth = year < currentYear || (year === currentYear && month < currentMonth);
+
+  // If month is past, all days in that month elapsed; if current, use day of month
+  const daysElapsedInMonth = isPastMonth
+    ? totalDaysInMonth
+    : Math.max(1, Math.min(totalDaysInMonth, date.getDate()));
 
   const targetAllowance = child.monthlyAllowanceTarget ?? 25; // default $25 if unset
 
@@ -101,4 +110,45 @@ export function calculateChildMonthlyAllowance(
     daysElapsedInMonth,
     totalDaysInMonth,
   };
+}
+
+/**
+ * Returns previous month metadata (year, monthKey, monthName, and middle-of-month Date).
+ */
+export function getPreviousMonthInfo(referenceDate: Date = new Date()): {
+  year: number;
+  monthIndex: number;
+  monthKey: string;
+  monthName: string;
+  date: Date;
+} {
+  const currentYear = referenceDate.getFullYear();
+  const currentMonth = referenceDate.getMonth(); // 0-11
+  
+  const prevDate = new Date(currentYear, currentMonth - 1, 15);
+  const year = prevDate.getFullYear();
+  const monthIndex = prevDate.getMonth();
+  const monthKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+  const monthName = prevDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  return {
+    year,
+    monthIndex,
+    monthKey,
+    monthName,
+    date: prevDate,
+  };
+}
+
+/**
+ * Formats a monthKey (e.g. "2026-09") into a human-readable date range, e.g. "September 1 – 30, 2026"
+ */
+export function formatMonthPeriod(monthKey: string): string {
+  const [yearStr, monthStr] = monthKey.split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10) - 1;
+  const d = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const monthName = d.toLocaleDateString('en-US', { month: 'long' });
+  return `${monthName} 1 – ${lastDay}, ${year}`;
 }

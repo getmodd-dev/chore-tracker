@@ -100,6 +100,7 @@ export interface AllowancePayoutRecord {
   amountPaid: number; // e.g. $25.50
   paidAt: string; // ISO string
   notes?: string;
+  isAutoSettled?: boolean; // true if automatically recorded at month-end reset
 }
 
 export interface AppSettings {
@@ -113,6 +114,8 @@ export interface AppSettings {
   defaultTheme?: AppTheme;
   pushoverAppToken?: string;        // Pushover Application API Token (e.g. 30 chars from pushover.net/apps/build)
   timezone?: string;                // Timezone for midnight rollover (defaults to 'America/Los_Angeles' PST/PDT)
+  monthlyAllowanceEmailEnabled?: boolean; // Send monthly summary email on the 1st
+  lastMonthlyReportSentMonth?: string;    // e.g. "2026-09"
 }
 
 export interface FamilyAppData {

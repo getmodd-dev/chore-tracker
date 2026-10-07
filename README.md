@@ -2,7 +2,7 @@
 
 > An iOS-optimized, family-friendly web application designed for self-hosting on **Unraid**, **Docker**, or any Linux container server. Track daily chore routines, points, task streaks, allowance, family rewards, and deliver scheduled push notifications directly to children's devices via Pushover.
 
-![Version](https://img.shields.io/badge/version-v2.5.0-indigo.svg)
+![Version](https://img.shields.io/badge/version-v2.6.0-indigo.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-green.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Unraid%20%7C%20Linux%20%7C%20Docker-orange.svg)
@@ -17,6 +17,16 @@
 - **Flexible Scheduling**: Set tasks as *Daily*, *Specific Days of the Week* (Mon–Sun), or *Bonus/On-Demand* tasks.
 - **Points & Monthly Allowance**: Categorize chores as point-earning, monthly allowance tasks, or hybrid bounties.
 - **Interactive Completion**: Satisfying check-off animations with celebratory confetti and one-click undo support.
+
+### 💰 Monthly Allowance Reset & Automated 1st-of-Month Email
+- **End-of-Month Auto-Reset**: At the end of each month, each child's monthly chore completion rate and earned cash payout are automatically finalized and archived into persistent settlement records.
+- **Fresh Start on the 1st**: On the 1st of every month, active allowance trackers reset to $0.00 so children start fresh to build their new month's streaks.
+- **Automated Statement Email on the 1st**: Every month on the 1st at 8:00 AM PST, an email summary is sent to parents via Gmail with the previous month's final details:
+  - Total family allowance payout owed
+  - Per-child completion percentage, target allowance, and earned cash payout
+  - Full breakdown of completed chore counts vs missed duties
+  - Direct link to open the Allowance Dashboard
+- **Preview & On-Demand Send**: Parents can preview the monthly email report or send it on-demand anytime from the Allowance tab or Settings.
 
 ### 👨‍👩‍👧‍👦 Multi-Child Profiles & Parent Controls
 - **Individual Child Profiles**: Switch between siblings seamlessly, each with their own points balance, active streaks, avatars, and visual theme preference.

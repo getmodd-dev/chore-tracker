@@ -7,8 +7,12 @@ import {
   getEmailConfig,
   sendDailyReport,
   generateDailyReportHtml,
+  sendMonthlyAllowanceReport,
+  generateMonthlyAllowanceReportHtml,
+  autoSettleMonthlyAllowance,
   initEmailScheduler,
 } from './src/server/emailService.ts';
+import { getPreviousMonthInfo } from './src/utils/allowance.ts';
 import {
   sendChildChoreSms,
   composeChildChoreSms,
@@ -819,6 +823,76 @@ app.get('/api/email/preview', (_req, res) => {
   res.json({ subject, html });
 });
 
+// GET HTML preview of the Monthly Allowance Settlement report email
+app.get('/api/email/monthly-allowance/preview', (req, res) => {
+  const { monthKey } = req.query;
+  const data = readData();
+  const preview = generateMonthlyAllowanceReportHtml(
+    data,
+    typeof monthKey === 'string' ? monthKey : undefined
+  );
+  res.json(preview);
+});
+
+// POST send immediate Monthly Allowance Settlement report email (Test / On-Demand)
+app.post('/api/email/monthly-allowance/send-now', async (req, res) => {
+  const { monthKey, recipientOverride, autoSettle = true } = req.body || {};
+  const data = readData();
+  const targetMonth = monthKey || getPreviousMonthInfo().monthKey;
+
+  if (autoSettle) {
+    autoSettleMonthlyAllowance(data, targetMonth);
+  }
+
+  const result = await sendMonthlyAllowanceReport(data, targetMonth, recipientOverride);
+  if (result.success) {
+    data.settings.lastMonthlyReportSentMonth = targetMonth;
+    writeData(data);
+    res.json(result);
+  } else {
+    res.status(400).json(result);
+  }
+});
+
+// POST trigger end-of-month allowance settlement and reset
+app.post('/api/allowance/trigger-monthly-reset', async (req, res) => {
+  const { sendEmail = true, monthKey } = req.body || {};
+  const data = readData();
+  const targetMonth = monthKey || getPreviousMonthInfo().monthKey;
+  const { settledCount, totalAmount, records } = autoSettleMonthlyAllowance(data, targetMonth);
+
+  let emailResult = null;
+  if (sendEmail) {
+    emailResult = await sendMonthlyAllowanceReport(data, targetMonth);
+    if (emailResult.success) {
+      data.settings.lastMonthlyReportSentMonth = targetMonth;
+    }
+  }
+  writeData(data);
+  res.json({
+    success: true,
+    monthKey: targetMonth,
+    settledCount,
+    totalAmount,
+    records,
+    emailResult,
+  });
+});
+
+// GET status of monthly allowance reset and scheduled delivery
+app.get('/api/allowance/monthly-status', (_req, res) => {
+  const config = getEmailConfig();
+  const prevMonthInfo = getPreviousMonthInfo();
+  const data = readData();
+  res.json({
+    emailConfigured: config.isConfigured,
+    recipient: config.recipient,
+    previousMonth: prevMonthInfo,
+    lastMonthlyReportSentMonth: data.settings?.lastMonthlyReportSentMonth || null,
+    allowancePayoutsCount: data.allowancePayouts?.length || 0,
+  });
+});
+
 // ---------------- SMS / AT&T GATEWAY NOTIFICATION ROUTES ----------------
 
 // GET child chore SMS preview text
@@ -923,9 +997,9 @@ app.post('/api/pushover/send-now', async (req, res) => {
 
 // Start server with Vite middleware in dev or static serving in prod
 async function startServer() {
-  // Initialize daily automated email scheduler
+  // Initialize daily automated email scheduler & monthly allowance scheduler
   try {
-    initEmailScheduler(readData);
+    initEmailScheduler(readData, writeData);
   } catch (err) {
     console.error('Failed to initialize email scheduler:', err);
   }

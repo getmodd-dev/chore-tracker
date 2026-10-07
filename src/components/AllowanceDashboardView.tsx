@@ -15,6 +15,11 @@ import {
   Receipt,
   Pencil,
   Zap,
+  Mail,
+  Send,
+  Eye,
+  RefreshCw,
+  X,
 } from 'lucide-react';
 
 interface AllowanceDashboardViewProps {
@@ -58,6 +63,11 @@ export const AllowanceDashboardView: React.FC<AllowanceDashboardViewProps> = ({
   const [customPayoutAmount, setCustomPayoutAmount] = useState<number>(0);
   const [isSubmittingPayout, setIsSubmittingPayout] = useState<boolean>(false);
   const [newTargetAmount, setNewTargetAmount] = useState<number>(child.monthlyAllowanceTarget ?? 25);
+  const [isSendingMonthlyEmail, setIsSendingMonthlyEmail] = useState<boolean>(false);
+  const [monthlyEmailFeedback, setMonthlyEmailFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
+  const [previewContent, setPreviewContent] = useState<{ subject: string; html: string } | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(false);
 
   // Compute reference date based on offset (0 = current month, -1 = last month)
   const targetDate = new Date();
@@ -109,6 +119,55 @@ export const AllowanceDashboardView: React.FC<AllowanceDashboardViewProps> = ({
       setShowPayoutModal(false);
     } finally {
       setIsSubmittingPayout(false);
+    }
+  };
+
+  const handleSendMonthlyStatementEmail = async (overrideMonthKey?: string) => {
+    const targetMonth = overrideMonthKey || allowanceStats.monthKey;
+    setIsSendingMonthlyEmail(true);
+    setMonthlyEmailFeedback(null);
+    try {
+      const res = await fetch('/api/email/monthly-allowance/send-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monthKey: targetMonth }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setMonthlyEmailFeedback({
+          type: 'success',
+          message: data.message || `Monthly report for ${targetMonth} successfully sent!`,
+        });
+      } else {
+        setMonthlyEmailFeedback({
+          type: 'error',
+          message: data.message || 'Failed to send monthly allowance report. Check Gmail credentials.',
+        });
+      }
+    } catch {
+      setMonthlyEmailFeedback({
+        type: 'error',
+        message: 'Could not connect to server to send email.',
+      });
+    } finally {
+      setIsSendingMonthlyEmail(false);
+    }
+  };
+
+  const handlePreviewMonthlyStatement = async (overrideMonthKey?: string) => {
+    const targetMonth = overrideMonthKey || allowanceStats.monthKey;
+    setIsLoadingPreview(true);
+    try {
+      const res = await fetch(`/api/email/monthly-allowance/preview?monthKey=${encodeURIComponent(targetMonth)}`);
+      const data = await res.json();
+      if (data && data.html) {
+        setPreviewContent(data);
+        setShowPreviewModal(true);
+      }
+    } catch {
+      alert('Failed to load email preview.');
+    } finally {
+      setIsLoadingPreview(false);
     }
   };
 
@@ -352,6 +411,91 @@ export const AllowanceDashboardView: React.FC<AllowanceDashboardViewProps> = ({
             </button>
           )}
         </div>
+      </div>
+
+      {/* Monthly Reset & Statement Automation Card */}
+      <div
+        className={`border rounded-2xl p-4 text-xs transition space-y-3 ${
+          isFintech ? 'bg-[#0f192d] border-[#1d2f52] text-slate-200' : 'bg-white border-slate-200 shadow-2xs text-slate-700'
+        }`}
+      >
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className={`p-2 rounded-xl shrink-0 ${isFintech ? 'bg-cyan-950/80 text-cyan-400 border border-cyan-500/30' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+              <Mail className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className={`font-bold text-sm ${isFintech ? 'text-white' : 'text-slate-900'}`}>
+                  Monthly Reset & Email Statement
+                </h4>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  isFintech ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30 font-mono' : 'bg-emerald-100 text-emerald-800'
+                }`}>
+                  {selectedMonthOffset === -1 ? 'Past Statement' : 'Resets on 1st'}
+                </span>
+              </div>
+              <p className={`text-[11px] mt-0.5 ${isFintech ? 'text-slate-400' : 'text-slate-500'}`}>
+                Allowance automatically resets on the 1st of every month at midnight. On the 1st at 8:00 AM PST, an email summary of the previous month's chore performance and earned cash payout is delivered to parents.
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons (Parent Mode) */}
+          {isParentMode && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => handlePreviewMonthlyStatement()}
+                disabled={isLoadingPreview}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer active:scale-95 ${
+                  isFintech
+                    ? 'bg-[#182644] hover:bg-[#1e3056] text-cyan-300 border-cyan-500/30'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                }`}
+                title="Preview the monthly allowance email"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>{isLoadingPreview ? 'Loading...' : 'Preview Email'}</span>
+              </button>
+
+              <button
+                onClick={() => handleSendMonthlyStatementEmail()}
+                disabled={isSendingMonthlyEmail}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 text-white ${
+                  isFintech
+                    ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                    : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
+                title="Send the monthly allowance report email to parent now"
+              >
+                <Send className={`w-3.5 h-3.5 ${isSendingMonthlyEmail ? 'animate-spin' : ''}`} />
+                <span>{isSendingMonthlyEmail ? 'Sending...' : 'Send Statement Email'}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {monthlyEmailFeedback && (
+          <div
+            className={`p-2.5 rounded-xl text-xs flex items-center justify-between border ${
+              monthlyEmailFeedback.type === 'success'
+                ? isFintech
+                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : isFintech
+                ? 'bg-rose-950/80 text-rose-300 border-rose-500/40'
+                : 'bg-rose-50 text-rose-800 border-rose-200'
+            }`}
+          >
+            <span>{monthlyEmailFeedback.message}</span>
+            <button
+              onClick={() => setMonthlyEmailFeedback(null)}
+              className="p-1 rounded hover:opacity-75 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* How It Works Banner / Explanation */}
@@ -680,6 +824,59 @@ export const AllowanceDashboardView: React.FC<AllowanceDashboardViewProps> = ({
                   className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold shadow-sm transition"
                 >
                   Save Target
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal: Preview Monthly Statement Email */}
+      {showPreviewModal && previewContent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-6 animate-in fade-in">
+          <div className="bg-white w-full max-w-xl max-h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-bold text-sm text-slate-900 truncate">
+                  {previewContent.subject || 'Monthly Allowance Statement Preview'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-100">
+              <div
+                className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+                dangerouslySetInnerHTML={{ __html: previewContent.html }}
+              />
+            </div>
+
+            <div className="p-3 border-t border-slate-100 bg-white flex items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-500">
+                Automated email scheduled for the 1st of every month at 8:00 AM PST
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPreviewModal(false);
+                    handleSendMonthlyStatementEmail();
+                  }}
+                  disabled={isSendingMonthlyEmail}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs cursor-pointer active:scale-95 transition"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Send to Parent Now</span>
                 </button>
               </div>
             </div>

@@ -121,6 +121,11 @@ export const SettingsAndUnraidModal: React.FC<SettingsAndUnraidModalProps> = ({
   const [emailPreviewHtml, setEmailPreviewHtml] = useState<string | null>(null);
   const [showEmailGuide, setShowEmailGuide] = useState(false);
 
+  // Monthly Allowance Email state
+  const [isSendingMonthlyEmail, setIsSendingMonthlyEmail] = useState(false);
+  const [monthlyEmailFeedback, setMonthlyEmailFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [monthlyPreviewHtml, setMonthlyPreviewHtml] = useState<string | null>(null);
+
   useEffect(() => {
     fetch('/api/unraid/status')
       .then((res) => res.json())
@@ -189,6 +194,48 @@ export const SettingsAndUnraidModal: React.FC<SettingsAndUnraidModalProps> = ({
       }
     } catch (err) {
       alert('Failed to load email preview.');
+    }
+  };
+
+  const handleSendMonthlyEmail = async () => {
+    setIsSendingMonthlyEmail(true);
+    setMonthlyEmailFeedback(null);
+    try {
+      const res = await fetch('/api/email/monthly-allowance/send-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        setMonthlyEmailFeedback({
+          type: 'success',
+          message: result.message || 'Monthly allowance report sent!',
+        });
+      } else {
+        setMonthlyEmailFeedback({
+          type: 'error',
+          message: result.message || 'Failed to send monthly allowance report. Check Gmail credentials.',
+        });
+      }
+    } catch {
+      setMonthlyEmailFeedback({
+        type: 'error',
+        message: 'Could not connect to server to send email.',
+      });
+    } finally {
+      setIsSendingMonthlyEmail(false);
+    }
+  };
+
+  const handleLoadMonthlyPreview = async () => {
+    try {
+      const res = await fetch('/api/email/monthly-allowance/preview');
+      const json = await res.json();
+      if (json.html) {
+        setMonthlyPreviewHtml(json.html);
+      }
+    } catch {
+      alert('Failed to load monthly allowance email preview.');
     }
   };
 
@@ -977,6 +1024,61 @@ docker compose up -d --build`}
           </button>
         </div>
 
+        {/* Monthly Allowance Statement & Reset on the 1st */}
+        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">💰</span>
+              <div>
+                <h4 className="font-bold text-xs text-slate-900">Monthly Allowance Statement on the 1st</h4>
+                <p className="text-[11px] text-slate-500">
+                  Sends on the 1st of every month at 8:00 AM PST with the previous month's final chore completion details and earned cash payout for each child. All children's allowance trackers then reset to $0.00 for the new month.
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 shrink-0">
+              Automated on 1st
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              onClick={handleSendMonthlyEmail}
+              disabled={isSendingMonthlyEmail}
+              className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold py-2.5 px-3 rounded-xl transition shadow-xs disabled:opacity-50 cursor-pointer"
+            >
+              <Send className={`w-3.5 h-3.5 ${isSendingMonthlyEmail ? 'animate-spin' : ''}`} />
+              <span>{isSendingMonthlyEmail ? 'Sending...' : 'Send Monthly Statement Now'}</span>
+            </button>
+
+            <button
+              onClick={handleLoadMonthlyPreview}
+              className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-100 active:scale-95 text-slate-800 text-xs font-bold py-2.5 px-3 rounded-xl transition border border-slate-200 cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5 text-slate-600" />
+              <span>Preview Monthly Statement</span>
+            </button>
+          </div>
+
+          {monthlyEmailFeedback && (
+            <div
+              className={`p-2 rounded-xl text-xs flex items-center justify-between ${
+                monthlyEmailFeedback.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  : 'bg-rose-50 text-rose-800 border border-rose-200'
+              }`}
+            >
+              <span>{monthlyEmailFeedback.message}</span>
+              <button
+                onClick={() => setMonthlyEmailFeedback(null)}
+                className="p-0.5 text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Gmail Setup Instructions Toggle */}
         <div className="pt-2">
           <button
@@ -1048,6 +1150,58 @@ docker compose up -d --build`}
               >
                 Close Preview
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Allowance Email Preview Modal */}
+      {monthlyPreviewHtml && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 sm:p-6 animate-in fade-in">
+          <div className="bg-white w-full max-w-xl max-h-[85vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">💰</span>
+                <h4 className="font-bold text-sm text-slate-900">Monthly Allowance Statement Preview</h4>
+              </div>
+              <button
+                onClick={() => setMonthlyPreviewHtml(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 bg-slate-100">
+              <div
+                className="bg-white rounded-xl shadow-xs overflow-hidden"
+                dangerouslySetInnerHTML={{ __html: monthlyPreviewHtml }}
+              />
+            </div>
+
+            <div className="p-3 border-t border-slate-100 bg-white flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">
+                Scheduled for the 1st of every month at 8:00 AM PST
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMonthlyPreviewHtml(null)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    setMonthlyPreviewHtml(null);
+                    handleSendMonthlyEmail();
+                  }}
+                  disabled={isSendingMonthlyEmail}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer active:scale-95"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Send Statement Now</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
