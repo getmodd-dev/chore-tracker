@@ -165,7 +165,10 @@ export const AllowanceDashboardView: React.FC<AllowanceDashboardViewProps> = ({
         setShowPreviewModal(true);
       }
     } catch {
-      alert('Failed to load email preview.');
+      setMonthlyEmailFeedback({
+        type: 'error',
+        message: 'Failed to load email preview.',
+      });
     } finally {
       setIsLoadingPreview(false);
     }

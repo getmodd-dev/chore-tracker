@@ -192,8 +192,11 @@ export const SettingsAndUnraidModal: React.FC<SettingsAndUnraidModalProps> = ({
       if (json.html) {
         setEmailPreviewHtml(json.html);
       }
-    } catch (err) {
-      alert('Failed to load email preview.');
+    } catch (_err) {
+      setEmailFeedback({
+        type: 'error',
+        message: 'Failed to load email preview.',
+      });
     }
   };
 
@@ -235,7 +238,10 @@ export const SettingsAndUnraidModal: React.FC<SettingsAndUnraidModalProps> = ({
         setMonthlyPreviewHtml(json.html);
       }
     } catch {
-      alert('Failed to load monthly allowance email preview.');
+      setMonthlyEmailFeedback({
+        type: 'error',
+        message: 'Failed to load monthly allowance email preview.',
+      });
     }
   };
 
