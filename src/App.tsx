@@ -511,6 +511,7 @@ export default function App() {
                 childrenList={data.children}
                 tasks={data.tasks}
                 todayLogs={data.logs.filter((l) => l.dateStr === todayStr)}
+                allLogs={data.logs}
                 currencySymbol={currencySymbol}
                 soundEnabled={data.settings.soundEnabled}
                 isParentMode={isParentMode}

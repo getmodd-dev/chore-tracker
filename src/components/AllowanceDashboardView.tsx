@@ -572,7 +572,7 @@ export const AllowanceDashboardView: React.FC<AllowanceDashboardViewProps> = ({
                         isFintech ? 'bg-[#1a2948] text-slate-400 border-[#263a62]' : 'bg-white text-slate-400 border-slate-200'
                       }`}
                     >
-                      {task.frequency}
+                      {task.frequency === 'once' ? '1-time' : task.frequency}
                     </span>
                     {task.choreType === 'both' && (
                       <span

@@ -52,6 +52,10 @@ export function composeChildPushoverMessage(
       }
       return true;
     }
+    if (t.frequency === 'once') {
+      const todayDateStr = getPacificDateStr(0);
+      return !t.dueDate || t.dueDate <= todayDateStr;
+    }
     return false; // Anytime tasks are optional
   });
 

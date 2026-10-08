@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
-import { ChoreTask, ChoreCategory, Child, TaskCompletionLog, AppTheme } from '../types';
+import { ChoreTask, ChoreCategory, Child, TaskCompletionLog, AppTheme, ChoreFrequency } from '../types';
 import { ChoreIcon } from './ChoreIcon';
 import { ChoreIconPicker } from './ChoreIconPicker';
 import {
@@ -25,6 +25,7 @@ import {
   formatScheduleLabel,
   isChoreScheduledForDate,
   formatLocalDate,
+  parseLocalDate,
 } from '../utils/schedule';
 import { getPacificDateStr, getPacificDayOfWeek } from '../utils/dateUtils';
 
@@ -33,6 +34,7 @@ interface TaskListViewProps {
   childrenList?: Child[];
   tasks: ChoreTask[];
   todayLogs: TaskCompletionLog[];
+  allLogs?: TaskCompletionLog[];
   currencySymbol: string;
   soundEnabled: boolean;
   isParentMode: boolean;
@@ -49,6 +51,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   childrenList = [],
   tasks,
   todayLogs,
+  allLogs,
   currencySymbol,
   soundEnabled,
   isParentMode,
@@ -94,7 +97,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   const [newPoints, setNewPoints] = useState(25);
   const [newCategory, setNewCategory] = useState<ChoreCategory>('daily_routine');
   const [newIcon, setNewIcon] = useState('sparkles');
-  const [newFrequency, setNewFrequency] = useState<'daily' | 'weekly' | 'anytime'>('daily');
+  const [newFrequency, setNewFrequency] = useState<ChoreFrequency>('daily');
+  const [newDueDate, setNewDueDate] = useState<string>(todayStr);
   const [newChoreType, setNewChoreType] = useState<'allowance' | 'bonus_points' | 'both'>('allowance');
   const [newDaysOfWeek, setNewDaysOfWeek] = useState<number[]>([getPacificDayOfWeek()]);
   const [newIntervalWeeks, setNewIntervalWeeks] = useState<number>(1);
@@ -109,6 +113,17 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     }
   });
 
+  // Map of all-time completion logs for this child (for one-time chores)
+  const allTimeCompletedMap = new Map<string, TaskCompletionLog>();
+  (allLogs || todayLogs).forEach((log) => {
+    if (log.childId === child.id) {
+      const existing = allTimeCompletedMap.get(log.taskId);
+      if (!existing || new Date(log.completedAt) > new Date(existing.completedAt)) {
+        allTimeCompletedMap.set(log.taskId, log);
+      }
+    }
+  });
+
   const handleOpenAddModal = () => {
     setEditingTaskId(null);
     setNewTitle('');
@@ -117,6 +132,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     setNewCategory('daily_routine');
     setNewIcon('sparkles');
     setNewFrequency('daily');
+    setNewDueDate(todayStr);
     setNewChoreType('allowance');
     setNewDaysOfWeek([getPacificDayOfWeek()]);
     setNewIntervalWeeks(1);
@@ -133,6 +149,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     setNewCategory(task.category);
     setNewIcon(task.icon);
     setNewFrequency(task.frequency);
+    setNewDueDate(task.dueDate || todayStr);
     setNewChoreType(task.choreType || 'allowance');
     setNewDaysOfWeek(task.daysOfWeek && task.daysOfWeek.length > 0 ? [...task.daysOfWeek] : [getPacificDayOfWeek()]);
     setNewIntervalWeeks(task.intervalWeeks || 1);
@@ -150,8 +167,14 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
       const q = searchQuery.toLowerCase();
       return task.title.toLowerCase().includes(q) || (task.description && task.description.toLowerCase().includes(q));
     }
+    const isDoneToday = completedTaskMap.has(task.id);
+    const isOnceCompletedPrior = task.frequency === 'once' && allTimeCompletedMap.has(task.id) && !isDoneToday;
+
     if (scheduleViewFilter === 'due_today') {
-      const isDoneToday = completedTaskMap.has(task.id);
+      // If a one-time chore was completed on a previous day, keep today's active list clean
+      if (isOnceCompletedPrior) {
+        return false;
+      }
       const isDueToday = isChoreScheduledForDate(task, todayStr);
       return isDoneToday || isDueToday;
     }
@@ -160,17 +183,22 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
 
   // Calculate counts for Due Today vs All Chores
   const assignedTasks = tasks.filter((t) => !t.assignedTo || t.assignedTo.length === 0 || t.assignedTo.includes(child.id));
-  const dueTodayCount = assignedTasks.filter((t) => completedTaskMap.has(t.id) || isChoreScheduledForDate(t, todayStr)).length;
+  const dueTodayCount = assignedTasks.filter((t) => {
+    const isDoneToday = completedTaskMap.has(t.id);
+    const isOnceCompletedPrior = t.frequency === 'once' && allTimeCompletedMap.has(t.id) && !isDoneToday;
+    if (isOnceCompletedPrior) return false;
+    return isDoneToday || isChoreScheduledForDate(t, todayStr);
+  }).length;
   const allCount = assignedTasks.length;
 
-  // Sort tasks: incomplete daily/scheduled first, then incomplete anytime, then completed at bottom
+  // Sort tasks: incomplete daily/scheduled first, then incomplete one-time, then anytime, then completed at bottom
   const sortedTasks = [...filteredTasks].sort((a, b) => {
-    const aDone = completedTaskMap.has(a.id);
-    const bDone = completedTaskMap.has(b.id);
+    const aDone = completedTaskMap.has(a.id) || (a.frequency === 'once' && allTimeCompletedMap.has(a.id));
+    const bDone = completedTaskMap.has(b.id) || (b.frequency === 'once' && allTimeCompletedMap.has(b.id));
     if (aDone !== bDone) return aDone ? 1 : -1;
-    const freqOrder: Record<string, number> = { daily: 0, weekly: 1, anytime: 2 };
-    const aOrder = freqOrder[a.frequency] ?? 1;
-    const bOrder = freqOrder[b.frequency] ?? 1;
+    const freqOrder: Record<string, number> = { daily: 0, weekly: 1, once: 2, anytime: 3 };
+    const aOrder = freqOrder[a.frequency] ?? 2;
+    const bOrder = freqOrder[b.frequency] ?? 2;
     if (aOrder !== bOrder) return aOrder - bOrder;
     return b.points - a.points;
   });
@@ -213,6 +241,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
       daysOfWeek: newFrequency === 'weekly' ? (newDaysOfWeek.length > 0 ? newDaysOfWeek : [getPacificDayOfWeek()]) : undefined,
       intervalWeeks: newFrequency === 'weekly' ? newIntervalWeeks : undefined,
       scheduleStartDate: newFrequency === 'weekly' && newIntervalWeeks === 2 ? newScheduleStartDate : undefined,
+      dueDate: newFrequency === 'once' ? newDueDate : undefined,
       isBonus: newChoreType === 'bonus_points' || newCategory === 'bonus',
       choreType: newChoreType,
       assignedTo: newAssignedTo.length > 0 ? newAssignedTo : undefined,
@@ -241,6 +270,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     daysOfWeek: newDaysOfWeek,
     intervalWeeks: newIntervalWeeks,
     scheduleStartDate: newScheduleStartDate,
+    dueDate: newDueDate,
   });
 
   return (
@@ -393,8 +423,12 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
           </div>
         ) : (
           sortedTasks.map((task) => {
-            const completionLog = completedTaskMap.get(task.id);
-            const isCompletedToday = !!completionLog;
+            const todayLog = completedTaskMap.get(task.id);
+            const allTimeLog = task.frequency === 'once' ? allTimeCompletedMap.get(task.id) : undefined;
+            const completionLog = todayLog || allTimeLog;
+            const isCompletedToday = !!todayLog;
+            const isCompletedOncePrior = !!allTimeLog && !todayLog;
+            const isCompleted = !!completionLog;
             const isAnimating = animatingTaskId === task.id;
             const isDueToday = isChoreScheduledForDate(task, todayStr);
 
@@ -404,7 +438,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                   key={task.id}
                   id={`task-item-${task.id}`}
                   className={`flex items-center justify-between py-2 px-3 sm:py-2.5 rounded-xl border transition-all ${
-                    isCompletedToday
+                    isCompleted
                       ? isFintech
                         ? 'bg-[#0b1222]/80 border-[#15233c] opacity-75'
                         : 'bg-emerald-50/70 border-emerald-200/80 opacity-85'
@@ -417,7 +451,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                   <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                     <div
                       className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border transition-transform ${
-                        isCompletedToday
+                        isCompleted
                           ? isFintech
                             ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-400'
                             : 'bg-emerald-100 border-emerald-300 text-emerald-700'
@@ -426,7 +460,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                           : 'bg-indigo-50 border-indigo-100 text-indigo-600'
                       } ${isAnimating ? 'scale-125 rotate-12' : ''}`}
                     >
-                      {isCompletedToday ? (
+                      {isCompleted ? (
                         <Check className="w-4 h-4 stroke-[3]" />
                       ) : (
                         <ChoreIcon name={task.icon} className="w-4 h-4" />
@@ -436,7 +470,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                     <div className="min-w-0 flex-1 flex items-center gap-2">
                       <h4
                         className={`text-xs sm:text-sm font-bold tracking-tight truncate ${
-                          isCompletedToday
+                          isCompleted
                             ? isFintech
                               ? 'text-slate-500 line-through'
                               : 'text-emerald-950 line-through'
@@ -487,22 +521,24 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
 
                   {/* Right: Complete Button / Undo & Parent actions */}
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {isCompletedToday ? (
+                    {isCompleted ? (
                       <div className="flex items-center gap-1">
                         <span className={`text-[11px] font-bold mr-1 ${isFintech ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                          Done ✓
+                          {isCompletedOncePrior ? 'Done' : 'Done ✓'}
                         </span>
-                        <button
-                          onClick={() => onUndoTask(completionLog.id)}
-                          className={`p-1.5 rounded-lg active:scale-95 transition border ${
-                            isFintech
-                              ? 'text-slate-400 hover:text-rose-400 bg-[#15233c] border-[#22365e]'
-                              : 'text-slate-400 hover:text-rose-600 bg-white border-slate-200'
-                          }`}
-                          title="Undo Chore Completion"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                        </button>
+                        {(isCompletedToday || isParentMode) && (
+                          <button
+                            onClick={() => onUndoTask(completionLog.id)}
+                            className={`p-1.5 rounded-lg active:scale-95 transition border ${
+                              isFintech
+                                ? 'text-slate-400 hover:text-rose-400 bg-[#15233c] border-[#22365e]'
+                                : 'text-slate-400 hover:text-rose-600 bg-white border-slate-200'
+                            }`}
+                            title="Undo Chore Completion"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <button
@@ -556,7 +592,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 key={task.id}
                 id={`task-item-${task.id}`}
                 className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
-                  isCompletedToday
+                  isCompleted
                     ? isFintech
                       ? 'bg-[#0b1222]/80 border-[#15233c] opacity-80'
                       : 'bg-emerald-50/60 border-emerald-200/80 opacity-90'
@@ -569,7 +605,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
                   <div
                     className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border transition-transform ${
-                      isCompletedToday
+                      isCompleted
                         ? isFintech
                           ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-400'
                           : 'bg-emerald-100 border-emerald-300 text-emerald-700'
@@ -578,7 +614,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                         : 'bg-indigo-50 border-indigo-100 text-indigo-600'
                     } ${isAnimating ? 'scale-125 rotate-12' : ''}`}
                   >
-                    {isCompletedToday ? (
+                    {isCompleted ? (
                       <Check className="w-6 h-6 stroke-[3]" />
                     ) : (
                       <ChoreIcon name={task.icon} className="w-5 h-5" />
@@ -589,7 +625,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h4
                         className={`text-sm font-bold tracking-tight truncate ${
-                          isCompletedToday
+                          isCompleted
                             ? isFintech
                               ? 'text-slate-500 line-through'
                               : 'text-emerald-950 line-through'
@@ -683,7 +719,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                       ) : null}
 
                       {/* Due Today Badge */}
-                      {!isCompletedToday && isDueToday && (
+                      {!isCompleted && isDueToday && (
                         <span
                           className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
                             isFintech
@@ -702,7 +738,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                       </p>
                     )}
 
-                    {isCompletedToday && (
+                    {isCompleted && (
                       <span
                         className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 ${
                           isFintech ? 'text-emerald-400 font-mono' : 'text-emerald-700'
@@ -714,6 +750,9 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                         ) : (
                           <>Executed (Earned towards Monthly Allowance 💵)</>
                         )}
+                        {task.frequency === 'once' && completionLog.dateStr && (
+                          <span className="opacity-75 font-normal">({completionLog.dateStr})</span>
+                        )}
                       </span>
                     )}
                   </div>
@@ -721,19 +760,24 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
 
                 {/* Right Action Button */}
                 <div className="flex items-center gap-2 shrink-0">
-                  {isCompletedToday ? (
+                  {isCompleted ? (
                     <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => onUndoTask(completionLog.id)}
-                        className={`p-2 rounded-xl active:scale-95 transition border ${
-                          isFintech
-                            ? 'text-slate-400 hover:text-rose-400 bg-[#15233c] hover:bg-rose-950/40 border-[#22365e]'
-                            : 'text-slate-400 hover:text-rose-600 bg-white hover:bg-rose-50 border-slate-200'
-                        }`}
-                        title="Undo Chore Completion"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
+                      <span className={`text-xs font-bold mr-1 ${isFintech ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                        {isCompletedOncePrior ? 'Done' : 'Done ✓'}
+                      </span>
+                      {(isCompletedToday || isParentMode) && (
+                        <button
+                          onClick={() => onUndoTask(completionLog.id)}
+                          className={`p-2 rounded-xl active:scale-95 transition border ${
+                            isFintech
+                              ? 'text-slate-400 hover:text-rose-400 bg-[#15233c] hover:bg-rose-950/40 border-[#22365e]'
+                              : 'text-slate-400 hover:text-rose-600 bg-white hover:bg-rose-50 border-slate-200'
+                          }`}
+                          title="Undo Chore Completion"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <button
@@ -865,12 +909,13 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                   <label className="block font-medium text-slate-700 mb-1">Frequency</label>
                   <select
                     value={newFrequency}
-                    onChange={(e) => setNewFrequency(e.target.value as 'daily' | 'weekly' | 'anytime')}
+                    onChange={(e) => setNewFrequency(e.target.value as ChoreFrequency)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-950 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     <option value="daily">Daily (Every Day)</option>
                     <option value="weekly">Specific Day(s) of the Week</option>
                     <option value="anytime">Anytime (Flexible)</option>
+                    <option value="once">One-Time Chore</option>
                   </select>
                 </div>
               </div>
@@ -1007,6 +1052,59 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                         Resulting Schedule: <strong className="font-black text-indigo-700">{previewScheduleLabel}</strong>
                       </span>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* One-Time Chore Due Date & Behavior Selector */}
+              {newFrequency === 'once' && (
+                <div className="space-y-2.5 bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                      <span>🎯</span>
+                      <span>Target Due Date</span>
+                    </label>
+                    <span className="text-[10px] text-amber-800 font-bold bg-amber-100/90 px-2 py-0.5 rounded-md border border-amber-200">
+                      One-time completion
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={newDueDate}
+                      onChange={(e) => setNewDueDate(e.target.value)}
+                      className="flex-1 bg-white border border-amber-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNewDueDate(todayStr)}
+                      className={`px-2.5 py-2 text-xs font-bold rounded-xl border transition ${
+                        newDueDate === todayStr
+                          ? 'bg-amber-600 text-white border-amber-600'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = parseLocalDate(todayStr);
+                        d.setDate(d.getDate() + 1);
+                        setNewDueDate(formatLocalDate(d));
+                      }}
+                      className="px-2.5 py-2 text-xs font-bold rounded-xl border bg-white text-slate-700 border-slate-200 hover:bg-slate-50 transition"
+                    >
+                      Tomorrow
+                    </button>
+                  </div>
+
+                  <div className="bg-white/90 border border-amber-200 text-amber-950 px-3 py-2 rounded-xl text-xs flex items-center gap-1.5">
+                    <span>✨</span>
+                    <span>
+                      Schedule: <strong className="font-bold text-amber-800">{previewScheduleLabel}</strong> — stays active until completed!
+                    </span>
                   </div>
                 </div>
               )}

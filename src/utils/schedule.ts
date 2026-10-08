@@ -32,6 +32,18 @@ export function formatLocalDate(date: Date): string {
 export function formatScheduleLabel(task: ChoreTask): string {
   if (task.frequency === 'daily') return 'Daily';
   if (task.frequency === 'anytime') return 'Anytime';
+  if (task.frequency === 'once') {
+    if (task.dueDate) {
+      try {
+        const d = parseLocalDate(task.dueDate);
+        const monthShort = d.toLocaleString('en-US', { month: 'short' });
+        return `One-Time • Due ${monthShort} ${d.getDate()}`;
+      } catch {
+        return `One-Time • Due ${task.dueDate}`;
+      }
+    }
+    return 'One-Time';
+  }
 
   // Weekly / Scheduled
   const days = task.daysOfWeek;
@@ -82,6 +94,10 @@ export function formatScheduleLabel(task: ChoreTask): string {
 export function isChoreScheduledForDate(task: ChoreTask, targetDateStr: string): boolean {
   if (task.frequency === 'daily') return true;
   if (task.frequency === 'anytime') return true; // Anytime chores can be done on any day
+  if (task.frequency === 'once') {
+    if (!task.dueDate) return true;
+    return task.dueDate <= targetDateStr;
+  }
 
   // Weekly / Specific days
   if (!task.daysOfWeek || task.daysOfWeek.length === 0) {
@@ -134,6 +150,9 @@ export function isChoreScheduledForDate(task: ChoreTask, targetDateStr: string):
 export function getNextScheduledDate(task: ChoreTask, fromDateStr: string = getPacificDateStr(0)): string | null {
   if (task.frequency === 'daily' || task.frequency === 'anytime') {
     return fromDateStr;
+  }
+  if (task.frequency === 'once') {
+    return task.dueDate || fromDateStr;
   }
 
   const start = parseLocalDate(fromDateStr);

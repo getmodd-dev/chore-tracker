@@ -73,6 +73,8 @@ export function calculateChildMonthlyAllowance(
       totalExpected += daysElapsedInMonth;
     } else if (task.frequency === 'weekly') {
       totalExpected += Math.max(1, Math.ceil(daysElapsedInMonth / 7));
+    } else if (task.frequency === 'once') {
+      totalExpected += 1;
     } else {
       // anytime: expect at least 2 times per month or 1 per 2 weeks elapsed
       totalExpected += Math.max(1, Math.floor(daysElapsedInMonth / 10));

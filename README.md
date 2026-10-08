@@ -14,7 +14,7 @@
 ### 📋 Chore & Task Management
 - **Compact & Detailed Views**: Toggle between a high-density, single-line **Compact View** (perfect for phones and tablets) and an expanded **Detailed View** with task descriptions and schedules.
 - **Custom Icon & Emoji Picker**: Choose from curated chore icons or paste/type **any emoji** (e.g. 🐶, 🪥, 🧹, 📚, ⚽) with live preview.
-- **Flexible Scheduling**: Set tasks as *Daily*, *Specific Days of the Week* (Mon–Sun), or *Bonus/On-Demand* tasks.
+- **Flexible Scheduling**: Set tasks as *Daily*, *Specific Days of the Week* (Mon–Sun), *Anytime (Flexible)*, or *One-Time Chores* with customizable target due dates that remain active until completed.
 - **Points & Monthly Allowance**: Categorize chores as point-earning, monthly allowance tasks, or hybrid bounties.
 - **Interactive Completion**: Satisfying check-off animations with celebratory confetti and one-click undo support.
 

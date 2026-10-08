@@ -38,6 +38,7 @@ export interface Child {
 }
 
 export type ChoreType = 'allowance' | 'bonus_points' | 'both';
+export type ChoreFrequency = 'daily' | 'weekly' | 'anytime' | 'once';
 
 export interface ChoreTask {
   id: string;
@@ -46,10 +47,11 @@ export interface ChoreTask {
   category: ChoreCategory;
   points: number;
   icon: string;
-  frequency: 'daily' | 'weekly' | 'anytime';
+  frequency: ChoreFrequency;
   daysOfWeek?: number[]; // [0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat]
   intervalWeeks?: number; // 1 = every week, 2 = every other week (bi-weekly)
   scheduleStartDate?: string; // YYYY-MM-DD anchor date for bi-weekly week parity
+  dueDate?: string; // Target due date for one-time chores (YYYY-MM-DD)
   assignedTo?: string[]; // Child IDs, empty array = all
   isBonus?: boolean;
   choreType?: ChoreType; // 'allowance' (core duty for monthly allowance), 'bonus_points' (prize points), or 'both'
