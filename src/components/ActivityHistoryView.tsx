@@ -25,6 +25,7 @@ interface ActivityHistoryViewProps {
   onUndoLog: (logId: string) => Promise<void>;
   onCompleteTask: (taskId: string, childId?: string, dateStr?: string) => Promise<void>;
   onAdjustPoints: (childId: string, amount: number, reason: string) => Promise<void>;
+  onDeleteTask?: (taskId: string) => void;
   theme?: AppTheme;
 }
 
@@ -39,6 +40,7 @@ export const ActivityHistoryView: React.FC<ActivityHistoryViewProps> = ({
   onUndoLog,
   onCompleteTask,
   onAdjustPoints,
+  onDeleteTask,
   theme = 'classic',
 }) => {
   const isFintech = theme === 'fintech_hustle';
@@ -133,6 +135,7 @@ export const ActivityHistoryView: React.FC<ActivityHistoryViewProps> = ({
           isParentMode={isParentMode}
           onCompleteTask={onCompleteTask}
           onUndoLog={onUndoLog}
+          onDeleteTask={onDeleteTask}
           theme={theme}
         />
       ) : (

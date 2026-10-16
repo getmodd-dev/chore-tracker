@@ -115,6 +115,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
 
   // Map of all-time completion logs for this child (for one-time chores)
   const allTimeCompletedMap = new Map<string, TaskCompletionLog>();
+  const familyCompletedTaskMap = new Map<string, TaskCompletionLog>();
+
   (allLogs || todayLogs).forEach((log) => {
     if (log.childId === child.id) {
       const existing = allTimeCompletedMap.get(log.taskId);
@@ -122,7 +124,18 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         allTimeCompletedMap.set(log.taskId, log);
       }
     }
+    const famExisting = familyCompletedTaskMap.get(log.taskId);
+    if (!famExisting || new Date(log.completedAt) > new Date(famExisting.completedAt)) {
+      familyCompletedTaskMap.set(log.taskId, log);
+    }
   });
+
+  const isOneTimeTaskCompleted = (t: ChoreTask) => {
+    if (t.frequency !== 'once') return false;
+    if (allTimeCompletedMap.has(t.id)) return true;
+    if ((!t.assignedTo || t.assignedTo.length === 0) && familyCompletedTaskMap.has(t.id)) return true;
+    return false;
+  };
 
   const handleOpenAddModal = () => {
     setEditingTaskId(null);
@@ -168,14 +181,16 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
       return task.title.toLowerCase().includes(q) || (task.description && task.description.toLowerCase().includes(q));
     }
     const isDoneToday = completedTaskMap.has(task.id);
-    const isOnceCompletedPrior = task.frequency === 'once' && allTimeCompletedMap.has(task.id) && !isDoneToday;
+    const isOnceCompletedPrior = task.frequency === 'once' && isOneTimeTaskCompleted(task) && !isDoneToday;
 
     if (scheduleViewFilter === 'due_today') {
       // If a one-time chore was completed on a previous day, keep today's active list clean
       if (isOnceCompletedPrior) {
         return false;
       }
-      const isDueToday = isChoreScheduledForDate(task, todayStr);
+      const isDueToday = task.frequency === 'once'
+        ? (!task.dueDate || task.dueDate <= todayStr)
+        : isChoreScheduledForDate(task, todayStr);
       return isDoneToday || isDueToday;
     }
     return true;
@@ -185,16 +200,19 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   const assignedTasks = tasks.filter((t) => !t.assignedTo || t.assignedTo.length === 0 || t.assignedTo.includes(child.id));
   const dueTodayCount = assignedTasks.filter((t) => {
     const isDoneToday = completedTaskMap.has(t.id);
-    const isOnceCompletedPrior = t.frequency === 'once' && allTimeCompletedMap.has(t.id) && !isDoneToday;
+    const isOnceCompletedPrior = t.frequency === 'once' && isOneTimeTaskCompleted(t) && !isDoneToday;
     if (isOnceCompletedPrior) return false;
-    return isDoneToday || isChoreScheduledForDate(t, todayStr);
+    const isDueToday = t.frequency === 'once'
+      ? (!t.dueDate || t.dueDate <= todayStr)
+      : isChoreScheduledForDate(t, todayStr);
+    return isDoneToday || isDueToday;
   }).length;
   const allCount = assignedTasks.length;
 
   // Sort tasks: incomplete daily/scheduled first, then incomplete one-time, then anytime, then completed at bottom
   const sortedTasks = [...filteredTasks].sort((a, b) => {
-    const aDone = completedTaskMap.has(a.id) || (a.frequency === 'once' && allTimeCompletedMap.has(a.id));
-    const bDone = completedTaskMap.has(b.id) || (b.frequency === 'once' && allTimeCompletedMap.has(b.id));
+    const aDone = completedTaskMap.has(a.id) || (a.frequency === 'once' && isOneTimeTaskCompleted(a));
+    const bDone = completedTaskMap.has(b.id) || (b.frequency === 'once' && isOneTimeTaskCompleted(b));
     if (aDone !== bDone) return aDone ? 1 : -1;
     const freqOrder: Record<string, number> = { daily: 0, weekly: 1, once: 2, anytime: 3 };
     const aOrder = freqOrder[a.frequency] ?? 2;
@@ -424,13 +442,17 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         ) : (
           sortedTasks.map((task) => {
             const todayLog = completedTaskMap.get(task.id);
-            const allTimeLog = task.frequency === 'once' ? allTimeCompletedMap.get(task.id) : undefined;
+            const allTimeLog = task.frequency === 'once'
+              ? (allTimeCompletedMap.get(task.id) || ((!task.assignedTo || task.assignedTo.length === 0) ? familyCompletedTaskMap.get(task.id) : undefined))
+              : undefined;
             const completionLog = todayLog || allTimeLog;
             const isCompletedToday = !!todayLog;
             const isCompletedOncePrior = !!allTimeLog && !todayLog;
             const isCompleted = !!completionLog;
             const isAnimating = animatingTaskId === task.id;
-            const isDueToday = isChoreScheduledForDate(task, todayStr);
+            const isDueToday = task.frequency === 'once'
+              ? (!task.dueDate || task.dueDate <= todayStr)
+              : isChoreScheduledForDate(task, todayStr);
 
             if (isCompactView) {
               return (
@@ -537,6 +559,19 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                             title="Undo Chore Completion"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {task.frequency === 'once' && (
+                          <button
+                            onClick={() => onDeleteTask(task.id)}
+                            className={`p-1.5 rounded-lg active:scale-95 transition border ${
+                              isFintech
+                                ? 'text-rose-400 hover:text-rose-300 bg-rose-950/30 hover:bg-rose-900/40 border-rose-500/30'
+                                : 'text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200'
+                            }`}
+                            title="Remove completed one-time chore"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
@@ -776,6 +811,19 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                           title="Undo Chore Completion"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {task.frequency === 'once' && (
+                        <button
+                          onClick={() => onDeleteTask(task.id)}
+                          className={`p-2 rounded-xl active:scale-95 transition border ${
+                            isFintech
+                              ? 'text-rose-400 hover:text-rose-300 bg-rose-950/30 hover:bg-rose-900/40 border-rose-500/30'
+                              : 'text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200'
+                          }`}
+                          title="Remove completed one-time chore"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>

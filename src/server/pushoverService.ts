@@ -54,6 +54,10 @@ export function composeChildPushoverMessage(
     }
     if (t.frequency === 'once') {
       const todayDateStr = getPacificDateStr(0);
+      const isCompletedPrior = data.logs.some(
+        (l) => l.taskId === t.id && (l.childId === child.id || !t.assignedTo || t.assignedTo.length === 0) && l.dateStr !== dateStr
+      );
+      if (isCompletedPrior) return false;
       return !t.dueDate || t.dueDate <= todayDateStr;
     }
     return false; // Anytime tasks are optional

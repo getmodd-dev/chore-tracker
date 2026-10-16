@@ -96,7 +96,7 @@ export function isChoreScheduledForDate(task: ChoreTask, targetDateStr: string):
   if (task.frequency === 'anytime') return true; // Anytime chores can be done on any day
   if (task.frequency === 'once') {
     if (!task.dueDate) return true;
-    return task.dueDate <= targetDateStr;
+    return task.dueDate === targetDateStr;
   }
 
   // Weekly / Specific days

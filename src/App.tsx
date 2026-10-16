@@ -594,6 +594,7 @@ export default function App() {
                 onUndoLog={handleUndoTask}
                 onCompleteTask={handleCompleteTask}
                 onAdjustPoints={handleAdjustPoints}
+                onDeleteTask={handleDeleteTask}
                 theme={currentTheme}
               />
             </motion.div>

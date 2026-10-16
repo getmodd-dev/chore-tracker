@@ -19,6 +19,7 @@ import {
   Star,
   Award,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 
 interface ChoreCalendarProps {
@@ -31,6 +32,7 @@ interface ChoreCalendarProps {
   isParentMode: boolean;
   onCompleteTask: (taskId: string, childId?: string, dateStr?: string) => Promise<void>;
   onUndoLog: (logId: string) => Promise<void>;
+  onDeleteTask?: (taskId: string) => void;
   theme?: AppTheme;
 }
 
@@ -53,6 +55,7 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
   isParentMode,
   onCompleteTask,
   onUndoLog,
+  onDeleteTask,
   theme = 'classic',
 }) => {
   const isFintech = theme === 'fintech_hustle';
@@ -177,11 +180,21 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
   const incompleteScheduledTasks: IncompleteItem[] = [];
   const incompleteOtherTasks: IncompleteItem[] = [];
 
+  // Set of all task IDs that have been completed at any time across all logs
+  const allTimeCompletedTaskIds = new Set(logs.map((l) => l.taskId));
+
   relevantChildren.forEach((child) => {
-    // Completed task IDs for this child on this date
+    // Completed task IDs for this child on this selected date
     const doneIds = new Set(
       logs
         .filter((l) => l.dateStr === selectedDateStr && l.childId === child.id)
+        .map((l) => l.taskId)
+    );
+
+    // Completed task IDs for this child across all time
+    const childAllTimeDoneIds = new Set(
+      logs
+        .filter((l) => l.childId === child.id)
         .map((l) => l.taskId)
     );
 
@@ -190,8 +203,35 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
       if (t.assignedTo && t.assignedTo.length > 0 && !t.assignedTo.includes(child.id)) {
         return;
       }
+
+      // One-time chore rule:
+      // If a one-time chore has already been completed (by this child or by anyone for pooled chores),
+      // it is COMPLETED. It must NEVER appear as an incomplete chore on ANY day in the calendar.
+      if (t.frequency === 'once') {
+        const isChildCompleted = childAllTimeDoneIds.has(t.id);
+        const isPooledCompleted = (!t.assignedTo || t.assignedTo.length === 0) && allTimeCompletedTaskIds.has(t.id);
+        if (isChildCompleted || isPooledCompleted) {
+          return;
+        }
+      }
+
       if (!doneIds.has(t.id)) {
-        const isScheduled = isChoreScheduledForDate(t, selectedDateStr);
+        let isScheduled = false;
+        if (t.frequency === 'once') {
+          if (!t.dueDate) {
+            isScheduled = true;
+          } else if (t.dueDate === selectedDateStr) {
+            isScheduled = true;
+          } else if (selectedDateStr === todayStr && t.dueDate < todayStr) {
+            // Overdue uncompleted one-time chore is due today
+            isScheduled = true;
+          } else {
+            isScheduled = false;
+          }
+        } else {
+          isScheduled = isChoreScheduledForDate(t, selectedDateStr);
+        }
+
         if (isScheduled) {
           incompleteScheduledTasks.push({ task: t, child, isScheduled: true });
         } else {
@@ -543,6 +583,8 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
             <div className="space-y-2">
               {selectedDateLogs.map((log) => {
                 const childObj = childrenList.find((c) => c.id === log.childId);
+                const matchedTask = tasks.find((t) => t.id === log.taskId);
+                const isOnce = matchedTask?.frequency === 'once';
                 const isUndoing = undoingLogId === log.id;
                 const timeStr = new Date(log.completedAt).toLocaleTimeString([], {
                   hour: '2-digit',
@@ -568,6 +610,11 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
                           <span className="text-[11px] text-slate-500 bg-white/80 px-1.5 py-0.5 rounded-md border border-slate-200/60">
                             {childObj?.avatar} {childObj?.name}
                           </span>
+                          {isOnce && (
+                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md">
+                              One-Time
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-slate-500 mt-0.5">
                           Completed at {timeStr}
@@ -594,6 +641,19 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
                         <RotateCcw className={`w-3.5 h-3.5 ${isUndoing ? 'animate-spin' : ''}`} />
                         <span>Undo</span>
                       </button>
+
+                      {/* Delete Completed One-Time Chore Definition */}
+                      {isOnce && onDeleteTask && (
+                        <button
+                          id={`btn-delete-task-def-${log.id}`}
+                          onClick={() => onDeleteTask(log.taskId)}
+                          className="flex items-center gap-1 px-2 py-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 rounded-xl text-xs font-bold transition active:scale-95"
+                          title="Delete one-time chore from list"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -764,11 +824,19 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
                   required
                 >
                   <option value="">-- Choose a chore --</option>
-                  {tasks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title} ({formatScheduleLabel(t)} • {t.choreType === 'allowance' ? 'Allowance' : `+${t.points} pts`})
-                    </option>
-                  ))}
+                  {tasks
+                    .filter((t) => {
+                      if (t.frequency === 'once') {
+                        // Do not allow re-logging an already completed one-time chore
+                        return !logs.some((l) => l.taskId === t.id);
+                      }
+                      return true;
+                    })
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title} ({formatScheduleLabel(t)} • {t.choreType === 'allowance' ? 'Allowance' : `+${t.points} pts`})
+                      </option>
+                    ))}
                 </select>
               </div>
 
